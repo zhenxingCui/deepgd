@@ -3,3 +3,5 @@ random_graph/
 test_opt_data/
 test_traingraph/
 .ipynb_checkpoints/
+*.log
+*_test/

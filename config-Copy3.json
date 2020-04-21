@@ -1,0 +1,20 @@
+{
+    "name": "skip_noshare_deep",
+    "batchsize": 16,
+    "epoch": {
+        "start": 1,
+        "end": 11000
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.95,
+        "decay_step": 10,
+        "override": null
+    },
+    "log_period": 10,
+    "test": {
+        "name": "skip_noshare_deep",
+        "epoch": 470,
+        "out_prefix": "dp_skip_nsd"
+    }
+}

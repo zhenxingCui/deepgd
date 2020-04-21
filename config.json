@@ -1,0 +1,19 @@
+{
+    "name": "noshare",
+    "epoch": {
+        "start": 1260,
+        "end": 11000
+    },
+    "lr" : {
+        "initial": 0.01,
+        "decay_rate": 0.95,
+        "decay_step": 10,
+        "override": null
+    },
+    "log_period": 10,
+    "test": {
+        "name": "noshare",
+        "epoch": 2160,
+        "out_prefix": "noshare"
+    }
+}

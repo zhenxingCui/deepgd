@@ -1,0 +1,20 @@
+{
+    "name": "randome_drop_sd_skip_noshare_angleloss",
+    "batchsize": 10,
+    "epoch": {
+        "start": 49,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "randome_drop_sd_skip_noshare_angleloss",
+        "epoch": 159,
+        "out_prefix": "drop_sd_angle"
+    }
+}
