@@ -6,4 +6,5 @@ test_traingraph/
 __pycache__/
 *.log
 *_test/
+*_test_old/
 *.pickle
