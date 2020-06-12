@@ -1,9 +1,9 @@
 {
-    "name": "randome_drop_sd_skip_noshare",
+    "name": "l1k1_stress_repoch",
     "batchsize": 8,
     "epoch": {
-        "start": 13,
-        "end": 11000
+        "start": 1,
+        "end": null
     },
     "lr" : {
         "initial": 0.001,
@@ -13,8 +13,8 @@
     },
     "log_period": 1,
     "test": {
-        "name": "randome_drop_sd_skip_noshare",
-        "epoch": 414,
-        "out_prefix": "drop_sd"
+        "name": "l1k1_stress_repoch",
+        "epoch": 135,
+        "out_prefix": "l1k1_stress_repoch"
     }
 }

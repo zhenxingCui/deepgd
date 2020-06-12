@@ -1,0 +1,20 @@
+{
+    "name": "share_8888_all_layer_u",
+    "batchsize": 64,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "share_8888_all_layer_u",
+        "epoch": 103,
+        "out_prefix": "share_8888_all_layer_u"
+    }
+}

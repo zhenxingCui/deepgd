@@ -6,143 +6,93 @@ import pickle
 import pathlib
 from itertools import chain, combinations
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
-from torch.nn import Linear
 import torch.nn.functional as F
+import torch_geometric.nn as gnn
 from torch_geometric.data import Data, DataLoader, Dataset
-from torch_geometric.nn import NNConv, BatchNorm
-import networkx as nx
-from matplotlib import pyplot as plt
 from torch_geometric.data.batch import Batch
+import networkx as nx
 import warnings
 from tqdm.notebook import tqdm
-from torch.nn import Dropout
+import nvidia_smi
+from sklearn import preprocessing
+from utils import *
 
 
-class Config:
-    def __init__(self, file):
-        self.file = file
-        
-    def __getitem__(self, index):
-        data = json.load(open(self.file))
-        if index is ...:
-            return data
-        return data[index]
-
-def generate_polygon(n, radius=1):
-    node_pos = [(radius * np.cos(2 * np.pi * i / n),
-                 radius * np.sin(2 * np.pi * i / n)) for i in range(n)]
-    x = torch.tensor(node_pos,dtype=torch.float)
-    return x
-
-def generate_randPos(n, seed=0):
-    random.seed(seed)
-    node_pos = [(random.uniform(-1, 1),
-                 random.uniform(-1, 1)) for i in range(n)]
-    x = torch.tensor(node_pos,dtype=torch.float)
-    return x
-
-def generate_edgelist(size):
-    edge_list = []
-    for i in range(size):
-        for j in range(size):
-#             p = random.random()
-#             if p > 0.5:
-#                 edge_list.append((i,j))
-#             else:
-#                 edge_list.append((j,i))  
-            if i != j:
-                edge_list.append((i,j))
-    return edge_list
-
-def node2edge(node_pos, batch):
-    data_list = batch.to_data_list() if type(batch) is Batch else [batch]
-    # find sizes for each graph in batch
-    graph_sizes = list(map(lambda d: d.x.size()[0], data_list))
-    # get split indices
-    start_idx = np.insert(np.cumsum(graph_sizes), 0, 0)
-    start_pos = []
-    end_pos = []
-    n_nodes = []
-    for i, num_nodes in enumerate(graph_sizes):
-        # get edge list for current graph
-        edgelist = np.array(generate_edgelist(num_nodes))
-        # get node positions for current graph
-        graph_node_pos = node_pos[start_idx[i]:start_idx[i+1]]
-        # get edge start positions for current graph
-        start_pos += [graph_node_pos[edgelist[:, 0]]]
-        # get edge end positions for current graph
-        end_pos += [graph_node_pos[edgelist[:, 1]]]
-        n_nodes += [torch.tensor([num_nodes] * len(edgelist),dtype=torch.float)]
-    # concatenate the results
-    return torch.cat(start_pos, 0), torch.cat(end_pos, 0), torch.cat(n_nodes, 0)
-
-def generate_eAttr(G, com_edge_list):
-    path_length = dict(nx.all_pairs_shortest_path_length(G))
-    max_length = 0
-    for source in path_length:
-        for target in path_length[source]:
-            if path_length[source][target] > max_length:
-                max_length = path_length[source][target]
-    L = 2/max_length
-    K = 1
-    edge_attr = []
-    for i in com_edge_list:
-        start = "n" + str(i[0])
-        end = "n" + str(i[1])
-        d = path_length[start][end]
-        l = L * d #l = L * d
-        k = K/(d**2) 
-        start_degree = G.degree(start)
-#         end_degree = G.degree(end)
-        edge_attr.append([l,k])
-    out = torch.tensor(edge_attr, dtype=torch.float)
-    return out
-
-def generate_graph(size):
-    while True:
-        G = nx.binomial_graph(size, random.uniform(0,0.2),directed=False)
-#         G = nx.random_powerlaw_tree(size,3,tries=10000)
-        com_edge_list = generate_edgelist(size)
-        try:
-            edge_attr = generate_eAttr(G, com_edge_list)
-        except KeyError:
-            continue
-        except ZeroDivisionError:
-            continue
-#         nx.write_edgelist(G, file_name, data=False)
-        edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_randPos(size)
-        data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-        return G, data
-
-def generate_testgraph(size,prob):
-    while True:
-        G = nx.binomial_graph(size, prob,directed=False)
-#         G = nx.random_powerlaw_tree(size,3,tries=10000)
-        com_edge_list = generate_edgelist(size)
-        try:
-            edge_attr = generate_eAttr(G, com_edge_list)
-        except KeyError:
-            continue
-        except ZeroDivisionError:
-            continue
-#         nx.write_edgelist(G, file_name, data=False)
-        edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_randPos(size)
-        data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-        return G, data
+def normalize(edge_vectors):
+    return edge_vectors / (np.linalg.norm(edge_vectors, axis=1, keepdims=True) + 1e-5)
 
 
-class EnergyLossVectorized(torch.nn.Module):
+def torch_normalize(x):
+    return x / (x.norm(dim=1).unsqueeze(dim=1) + 1e-5)
+
+
+def get_real_edges(batch):
+    l = batch.edge_attr[:, 0]
+    edges = batch.edge_index.T
+    return edges[l == l.min()]
+
+
+def get_counter_clockwise_sorted_angle_vertices(edges, pos):
+    if type(pos) is torch.Tensor:
+        edges = edges.cpu().detach().numpy()
+        pos = pos.cpu().detach().numpy()
+    u, v = edges[:, 0], edges[:, 1]
+    diff = pos[v] - pos[u]
+    diff_normalized = normalize(diff)
+    # get cosine angle between uv and y-axis
+    cos = diff_normalized @ np.array([[1],[0]])
+    # get radian between uv and y-axis
+    radian = np.arccos(cos) * np.expand_dims(np.sign(diff[:, 1]), axis=1)
+    # for each u, sort edges based on the position of v
+    sorted_idx = sorted(np.arange(len(edges)), key=lambda e: (u[e], radian[e]))
+    sorted_v = v[sorted_idx]
+    # get start index for each u
+    idx = np.unique(u, return_index=True)[1]
+    roll_idx = np.arange(1, len(u) + 1)
+    roll_idx[np.roll(idx - 1, -1)] = idx
+    rolled_v = sorted_v[roll_idx]
+    return np.stack([u, sorted_v, rolled_v]).T[sorted_v != rolled_v]
+
+
+def get_theta_angles_and_node_degrees(node_pos, batch, return_u=False):
+    real_edges = get_real_edges(batch)
+    angles = get_counter_clockwise_sorted_angle_vertices(real_edges, node_pos)
+    u, v1, v2 = angles[:, 0], angles[:, 1], angles[:, 2]
+    e1 = torch_normalize(node_pos[v1] - node_pos[u])
+    e2 = torch_normalize(node_pos[v2] - node_pos[u])
+    theta = (e1 * e2).sum(dim=1).acos()
+    degrees = get_node_degrees_by_indices(real_edges, u)
+    if return_u:
+        return theta, degrees, u
+    else:
+        return theta, degrees
+
+
+# min over u
+def resolution_score(theta, degree, u):
+    sorted_idx = sorted(np.arange(len(u)), key=lambda e: (u[e], theta[e]))
+    u_idx = np.unique(u, return_index=True)[1]
+    min_theta = theta[sorted_idx][u_idx].cpu()
+    min_degree = degree[u_idx].cpu()
+    return (min_theta * min_degree/(2 * np.pi)).mean().item()
+    
+
+def get_node_degrees_by_indices(real_edges, indices):
+    node, degrees = np.unique(real_edges[:, 0].detach().cpu().numpy(), return_counts=True)
+    return torch.tensor(degrees[indices], device=real_edges.device)
+
+
+class EnergyLossVectorized(torch.nn.Module): # StressLoss
     def __init__(self):
         super().__init__()
         
-    def forward(self, p, data):
-        edge_attr = data.edge_attr
+    def forward(self, p, batch):
+        edge_attr = batch.edge_attr
         # convert per-node positions to per-edge positions
-        start, end, n_nodes = node2edge(p, data)
+        start, end = node2edge(p, batch)
         
         start_x = start[:, 0]
         start_y = start[:, 1]
@@ -152,58 +102,195 @@ class EnergyLossVectorized(torch.nn.Module):
         l = edge_attr[:, 0]
         k = edge_attr[:, 1]
         
-        term1 = (start_x - end_x) ** 2
-        term2 = (start_y - end_y) ** 2
-        term3 = l ** 2
-        term4 = 2 * l * (term1 + term2).sqrt()
+        term1 = (start_x - end_x).pow(2)
+        term2 = (start_y - end_y).pow(2)
+        term3 = l.pow(2)
+        term4 = 2 * l * (term1 + term2).abs().sqrt()
         energy = k / 2 * (term1 + term2 + term3 - term4)
         return energy.sum()
-    
-class CosineAngleLoss(nn.Module):
+
+
+# NEW #
+class MeanStressLoss(torch.nn.Module):
     def __init__(self):
         super().__init__()
         
-    def _get_real_edges(self, batch):
-        data_list = batch.to_data_list() if type(batch) is Batch else [batch]
-    
-        offset = 0
-        neighbor_mask_, edge_list_ = [], []
-        for data in data_list:
-            size = data.num_nodes
-            edge_list_.append(np.array(generate_edgelist(size)) + offset)
-            l = data.edge_attr[:, 0].detach().cpu().numpy()
-            neighbor_mask_.append(l == l.min())
-            offset += size
-        neighbor_mask = np.concatenate(neighbor_mask_)
-        edge_list = np.concatenate(edge_list_)
-
-        return edge_list[neighbor_mask]
+    def forward(self, p, batch):
+        edge_attr = batch.edge_attr
+        # convert per-node positions to per-edge positions
+        start, end = node2edge(p, batch)
         
-    def _get_angles(self, real_edges):
-        vi0_, vi12_ = [], []
-        for i in np.unique(real_edges[:, 0]):
-            vi = list(combinations(real_edges[real_edges[:, 0] == i][:, 1], 2))
-            vi0_.append(np.repeat(i, len(vi)))
-            vi12_.append(np.array(vi).reshape((-1, 2)))
-        vi0 = np.concatenate(vi0_)
-        vi1, vi2 = np.concatenate(vi12_).astype(int).T
+        start_x = start[:, 0]
+        start_y = start[:, 1]
+        end_x = end[:, 0]
+        end_y = end[:, 1]
         
-        return vi0, vi1, vi2
+        l = edge_attr[:, 0]
+        k = edge_attr[:, 1]
+        
+        term1 = (start_x - end_x).pow(2)
+        term2 = (start_y - end_y).pow(2)
+        term3 = l.pow(2)
+        term4 = 2 * l * (term1 + term2).abs().sqrt()
+        energy = k / 2 * (term1 + term2 + term3 - term4)
+        return energy.mean()
     
-    def _normalize(self, edge_vectors):
-        return edge_vectors / ((edge_vectors ** 2).sum(dim=1)
-                                                  .sqrt()
-                                                  .repeat(2, 1)
-                                                  .t())
+    
+class AngularResolutionLoss(nn.Module): # AngularResolutionSAELoss
+    def __init__(self):
+        super().__init__()
         
     def forward(self, node_pos, batch):
-        real_edges = self._get_real_edges(batch)
-        vi0, vi1, vi2 = self._get_angles(real_edges)
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).abs().sum()
     
-        e1 = self._normalize(node_pos[vi1] - node_pos[vi0])
-        e2 = self._normalize(node_pos[vi2] - node_pos[vi0])
+
+class AngularResolutionL2Loss(nn.Module):
+    def __init__(self):
+        super().__init__()
         
-        return (e1 * e2).sum()
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).square().sum().abs().sqrt()
+    
+    
+# NEW #
+class AngularResolutionLinfLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).max()
+    
+    
+# NEW #
+class AngularResolutionMAELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).abs().mean()
+    
+
+# NEW #
+class AngularResolutionMSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).square().mean()
+    
+    
+class AngularResolutionSquareLoss(nn.Module): # AngularResolutionSSELoss
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).square().sum()
+    
+    
+class AngularResolutionRatioLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        eps = 1e-5
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).abs().div(theta + eps).sum()
+    
+    
+# NEW #
+class AngularResolutionMeanRatioLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        eps = 1e-5
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).abs().div(theta + eps).mean()
+    
+    
+class AngularResolutionSineLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).abs().div(2).sin().sum()
+    
+    
+# NEW #
+class AngularResolutionMeanSineLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        theta, degrees = get_theta_angles_and_node_degrees(node_pos, batch)
+        phi = degrees.float().pow(-1).mul(2*np.pi)
+        return phi.sub(theta).abs().div(2).sin().mean()
+    
+    
+class RingLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        eps = 1e-5
+        edge_attr = batch.edge_attr
+        # convert per-node positions to per-edge positions
+        start, end = node2edge(node_pos, batch)
+        
+        start_x = start[:, 0]
+        start_y = start[:, 1]
+        end_x = end[:, 0]
+        end_y = end[:, 1]
+        
+        dist = (end - start).norm(dim=1)
+        
+        l = edge_attr[:, 0].min()
+        k = 1
+        
+        energy = l * k / (dist + eps)
+        return energy.sum()
+    
+    
+# NEW #
+class MeanRingLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, node_pos, batch):
+        eps = 1e-5
+        edge_attr = batch.edge_attr
+        # convert per-node positions to per-edge positions
+        start, end = node2edge(node_pos, batch)
+        
+        start_x = start[:, 0]
+        start_y = start[:, 1]
+        end_x = end[:, 0]
+        end_y = end[:, 1]
+        
+        dist = (end - start).norm(dim=1)
+        
+        l = edge_attr[:, 0].min()
+        k = 1
+        
+        energy = l * k / (dist + eps)
+        return energy.mean()
+    
     
 class CompositeLoss(nn.Module):
     def __init__(self, criterions, weights=None):
@@ -211,143 +298,86 @@ class CompositeLoss(nn.Module):
         self.weights = np.ones(len(criterions)) if weights is None else weights
         self.criterions = criterions
         
-    def forward(self, *args, **kwargs):
+    def __len__(self):
+        return len(self.criterions)
+        
+    def forward(self, *args, output_components=False, **kwargs):
         losses = 0
+        components = []
         for criterion, weight in zip(self.criterions, self.weights):
-            losses += criterion(*args, **kwargs) * weight
-        return losses
+            loss = criterion(*args, **kwargs)
+            losses += loss * weight
+            components += [loss]
+        if output_components:
+            return losses, components
+        else:
+            return losses
     
-def train(model, criterion, optimizer, loader, data_list, device, epoch=None):
-    model.train()
-    loss_all = 0
-    desc = f"epoch {epoch}" if epoch is not None else None
-    for data in tqdm(loader, desc=desc, leave=False):
-        data = data.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, data)
-        loss.backward()
-        loss_all += loss.item()
-        optimizer.step()
-    return loss_all / len(data_list)
 
-def evaluate(model,data,criterion,device):
-    model.eval()
-    with torch.no_grad():
-        data = data.to(device)
-        pred = model(data).detach()
-        loss = criterion(pred,data).cpu().numpy()
-        loss = round(float(loss),2)
-    return pred.cpu().numpy(),loss
-
-def shuffle_rome(index_file):
-    files = glob.glob('../rome/*.graphml')
-    random.shuffle(files)
-    with open(index_file, "w") as fout:
-        for f in files:
-            print(f, file=fout)
-
-def load_rome(index_file):
-    G_list = []
-    count = 0
-    for file in open(index_file).read().splitlines():
-        G = nx.read_graphml(file)
-        G_list.append(G)
-    return G_list
-
-def graph_vis(G, node_pos, file_name):
-    i = 0
-    for n, p in node_pos:
-        node = 'n' +str(i)
-        G.nodes[node]['pos'] = (n,p)
-        i += 1
-    pos = nx.get_node_attributes(G,'pos')
-    plt.figure()
-    nx.draw(G, pos)
-    plt.savefig(file_name) 
-    
-def convert_datalist(rome):
-    data_list = []
-    G_list = []
-    for G in rome:
-        size = G.number_of_nodes()
-        com_edge_list = generate_edgelist(size)
-        try:
-            edge_attr = generate_eAttr(G, com_edge_list)
-        except KeyError:
-            continue
-        except ZeroDivisionError:
-            continue
-        edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_randPos(size)
-        data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-        data_list.append(data)
-        G_list.append(G)
-    return G_list,data_list
-
-
-class Net(torch.nn.Module):
-    def __init__(self):
+class GNNLayer(nn.Module):
+    def __init__(self, in_vfeat, out_vfeat, in_efeat, edge_net=None, bn=False, act=False, dp=None, aggr='mean'):
         super().__init__()
-        edge_feats = 2
+        self.enet = nn.Linear(in_efeat, in_vfeat * out_vfeat) if edge_net is None else edge_net
+        self.conv = gnn.NNConv(in_vfeat, out_vfeat, self.enet, aggr=aggr)
+        self.bn = gnn.BatchNorm(out_vfeat) if bn else nn.Identity()
+        self.act = nn.LeakyReLU() if act else nn.Identity()
+        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
         
-        self.conv1 = NNConv(2, 16, Linear(edge_feats, 2*16), aggr='mean')
-        self.conv2 = NNConv(16, 16, Linear(edge_feats, 16*16), aggr='mean')
-        self.conv3 = NNConv(4*16, 2, Linear(edge_feats, 4*16*2), aggr='mean')
-        self.relu = nn.LeakyReLU()
-        self.bn1 = BatchNorm(16)
-        self.bn2 = BatchNorm(16)
-        self.bn3 = BatchNorm(16)
-        self.bn4 = BatchNorm(16)
-#         self.conv4 = NNConv(16+32+64, 128, Linear(2, (16+32+64)*128))
-#         self.conv5 = NNConv(128,2,Linear(2,128*2))
-#         self.conv2 = NNConv(16,2,Linear(2,16*2))
+    def forward(self, v, e, data):
+        return self.dp(self.act(self.bn(self.conv(v, data.edge_index, e))))
 
-    def forward(self, data):
-        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
 
-        x1 = self.relu(self.conv1(x, edge_index, edge_attr))
-        x2 = self.relu(self.conv2(x1, edge_index, edge_attr))
-        x3 = self.relu(self.conv2(x2, edge_index, edge_attr))
-        x4 = self.relu(self.conv2(x3, edge_index, edge_attr))
-        x5 = torch.cat((x1, x2, x3, x4), dim=1)
-        x6 = self.conv3(x5, edge_index, edge_attr)
-#         x2 = F.relu(self.conv2(x1, edge_index, edge_attr))
-#         x3 = F.relu(self.conv3(x2, edge_index, edge_attr))
-        
-#         x4 = F.relu(self.conv4(x, edge_index, edge_attr))
-#         x5 = F.relu(self.conv5(x4,edge_index,edge_attr))
-        return x6
-
-class Net_WD_BN(torch.nn.Module):
-    def __init__(self):
+class GNNBlock(nn.Module):
+    def __init__(self, feat_dims, 
+                 efeat_hid_dims=[], 
+                 efeat_hid_acts=nn.LeakyReLU,
+                 bn=False, 
+                 act=True, 
+                 dp=None, 
+                 extra_efeat='skip', 
+                 euclidian=False, 
+                 direction=False, 
+                 residual=False):
+        '''
+        extra_efeat: {'skip', 'first', 'prev'}
+        '''
         super().__init__()
-        edge_feats = 3
+        self.extra_efeat = extra_efeat
+        self.euclidian = euclidian
+        self.direction = direction
+        self.residual = residual
+        self.gnn = nn.ModuleList()
+        self.n_layers = len(feat_dims) - 1
         
-        self.conv1 = NNConv(2, 16, Linear(edge_feats, 2*16), aggr='mean')
-        self.conv2 = NNConv(16, 16, Linear(edge_feats, 16*16), aggr='mean')
-        self.conv3 = NNConv(4*16, 2, Linear(edge_feats, 4*16*2), aggr='mean')
-        self.relu = nn.LeakyReLU()
-        self.bn1 = BatchNorm(16)
-        self.bn2 = BatchNorm(16)
-        self.bn3 = BatchNorm(16)
-        self.bn4 = BatchNorm(16)
-#         self.conv4 = NNConv(16+32+64, 128, Linear(2, (16+32+64)*128))
-#         self.conv5 = NNConv(128,2,Linear(2,128*2))
-#         self.conv2 = NNConv(16,2,Linear(2,16*2))
-
-    def forward(self, data):
-        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
-
-        x1 = self.relu(self.bn1(self.conv1(x, edge_index, edge_attr)))
-        x2 = self.relu(self.bn2(self.conv2(x1, edge_index, edge_attr)))
-        x3 = self.relu(self.bn3(self.conv2(x2, edge_index, edge_attr)))
-        x4 = self.relu(self.bn4(self.conv2(x3, edge_index, edge_attr)))
-        x5 = torch.cat((x1, x2, x3, x4), dim=1)
-        x6 = self.conv3(x5, edge_index, edge_attr)
-#         x2 = F.relu(self.conv2(x1, edge_index, edge_attr))
-#         x3 = F.relu(self.conv3(x2, edge_index, edge_attr))
+        for idx, (in_feat, out_feat) in enumerate(zip(feat_dims[:-1], feat_dims[1:])):
+            direction_dim = feat_dims[idx] if self.extra_efeat == 'prev' else feat_dims[0]
+            in_efeat_dim = 2
+            if self.extra_efeat != 'first': 
+                in_efeat_dim += self.euclidian + self.direction * direction_dim 
+            edge_net = nn.Sequential(*chain.from_iterable(
+                [nn.Linear(idim, odim),
+                 nn.BatchNorm1d(odim),
+                 act()]
+                for idim, odim, act in zip([in_efeat_dim] + efeat_hid_dims,
+                                           efeat_hid_dims + [in_feat * out_feat],
+                                           [efeat_hid_acts] * len(efeat_hid_dims) + [nn.Tanh])
+            ))
+            self.gnn.append(GNNLayer(in_vfeat=in_feat, 
+                                     out_vfeat=out_feat, 
+                                     in_efeat=in_efeat_dim, 
+                                     edge_net=edge_net,
+                                     bn=bn, 
+                                     act=act, 
+                                     dp=dp))
         
-#         x4 = F.relu(self.conv4(x, edge_index, edge_attr))
-#         x5 = F.relu(self.conv5(x4,edge_index,edge_attr))
-        return x6
+    def forward(self, v, data):
+        vres = v
+        for layer in range(self.n_layers):
+            vsrc = v if self.euclidian == 'prev' else vres
+            get_extra = not (self.extra_efeat == 'first' and layer != 0)
+            e = get_edge_feat(vsrc, data, 
+                              euclidian=self.euclidian and get_extra, 
+                              direction=self.direction and get_extra)
+            v = self.gnn[layer](v, e, data)
+        return v + vres if self.residual else v
+        

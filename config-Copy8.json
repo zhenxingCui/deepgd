@@ -1,8 +1,8 @@
 {
     "name": "randome_drop_sd_skip_noshare_angleloss",
-    "batchsize": 10,
+    "batchsize": 8,
     "epoch": {
-        "start": 49,
+        "start": 0,
         "end": null
     },
     "lr" : {
@@ -13,8 +13,8 @@
     },
     "log_period": 1,
     "test": {
-        "name": "randome_drop_sd_skip_noshare_angleloss",
-        "epoch": 159,
+        "name": "angleloss_randome_drop_sd_skip_noshare",
+        "epoch": 645,
         "out_prefix": "drop_sd_angle"
     }
 }

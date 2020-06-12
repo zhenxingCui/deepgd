@@ -1,0 +1,20 @@
+{
+    "name": "resoSine0.6_2l_dir_u_8888",
+    "batchsize": 128,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "resoSine0.6_2l_dir_u_8888",
+        "epoch": 621,
+        "out_prefix": "resoSine0.6_2l_dir_u_8888"
+    }
+}
