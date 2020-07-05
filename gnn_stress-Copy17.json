@@ -1,0 +1,20 @@
+{
+    "name": "noin_angleloss_0.3",
+    "batchsize": 4,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "noin_angleloss_0.3",
+        "epoch": 40,
+        "out_prefix": "noin_angleloss"
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "name": "dir_8888_all_layer_u",
+    "batchsize": 8,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "dir_8888_all_layer_u",
+        "epoch": 280,
+        "out_prefix": "dir_8888_all_layer_u"
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "name": "l1k1_stress_repoch",
+    "batchsize": 8,
+    "epoch": {
+        "start": 1,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "l1k1_stress_repoch",
+        "epoch": 135,
+        "out_prefix": "l1k1_stress_repoch"
+    }
+}

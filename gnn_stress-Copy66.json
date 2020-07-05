@@ -1,0 +1,20 @@
+{
+    "name": "stressOnly_meanOverBatch_2l_dir_u_8888",
+    "batchsize": 120,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.01,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "stressOnly_meanOverBatch_2l_dir_u_8888",
+        "epoch": 584,
+        "out_prefix": "stressOnly_meanOverBatch_2l_dir_u_8888"
+    }
+}

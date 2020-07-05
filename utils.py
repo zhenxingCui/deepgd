@@ -1,28 +1,8 @@
-import os
-import random 
-import glob
-import json
-import pickle
-import pathlib
-from pprint import pformat
-from itertools import chain, combinations
-import numpy as np
-import pandas as pd
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from umap import UMAP
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.data import Data, DataLoader, Dataset
-from torch_geometric.nn import NNConv, BatchNorm
-import networkx as nx
-import matplotlib.pyplot as plt
-from torch_geometric.data.batch import Batch
-import warnings
-from tqdm.notebook import tqdm
-import nvidia_smi
-from bentley_ottmann.planar import segments_intersections as intersect
+from imports import *
+from functions import *
+from modules import *
+from ipynb.fs.defs.losses import *
+
 
 class Config:
     class Store:
@@ -35,8 +15,13 @@ class Config:
             self.__dict__ = dict(map(wrap, data.items()))
 
         def __getitem__(self, item):
+            def unwrap(kvpair):
+                key, value = kvpair
+                if type(value) is Config.Store:
+                    return key, value[...]
+                return kvpair
             if item is ...:
-                return self.__dict__
+                return dict(map(unwrap, self.__dict__.items()))
             return self.__dict__[item]
 
         def __repr__(self):
@@ -50,7 +35,7 @@ class Config:
         
     def __getitem__(self, item):
         data = Config.Store(json.load(open(self.file)))
-        if item is ...:
+        if item is None:
             return data
         return data[item]
     
@@ -58,15 +43,11 @@ class Config:
         return self[attr]
     
     def __repr__(self):
-        return pformat(self[...])#, sort_dicts=False)
+        return pformat(self[None])#, sort_dicts=False)
     
     def __str__(self):
-        return str(self[...])
+        return str(self[None])
     
-    
-def node2edge(node_pos, batch):
-    return node_pos[batch.edge_index[0, :].t()], node_pos[batch.edge_index[1, :].t()]
-
 
 def generate_polygon(n, radius=1):
     node_pos = [(radius * np.cos(2 * np.pi * i / n),
@@ -87,28 +68,10 @@ def generate_edgelist(size):
     return [(i, j) for i in range(size) for j in range(size) if i != j]
 
 
-def find_intersect(segments,accurate = True):
+def find_intersect(segments, accurate=True):
     intersect(segments)
     
-def get_euclidian(node_feat, batch):
-    eps = 1e-5
-    start_pos, end_pos = node2edge(node_feat, batch)
-    vector = end_pos - start_pos
-    euclidian = vector.norm(2, dim=1).unsqueeze(dim=1)
-    direction = vector / (euclidian + eps)
-    return euclidian, direction
 
-
-def get_edge_feat(v, data, euclidian=False, direction=False):
-        e = data.edge_attr
-        if euclidian or direction:
-            u, d = get_euclidian(v, data)
-            if euclidian:
-                e = torch.cat([e, u], dim=1)
-            if direction:
-                e = torch.cat([e, d], dim=1)
-        return e
-    
     
 def generate_eAttr(G, com_edge_list):
     path_length = dict(nx.all_pairs_shortest_path_length(G))
@@ -151,7 +114,7 @@ def generate_graph(size):
         return G, data
 
     
-def generate_testgraph(size,prob):
+def generate_testgraph(size, prob):
     while True:
         G = nx.binomial_graph(size, prob,directed=False)
 #         G = nx.random_powerlaw_tree(size,3,tries=10000)
@@ -185,63 +148,156 @@ def load_processed_data(G_list_file='G_list.pickle',
     return G_list, data_list
 
 
-def train(model, criterion, optimizer, loader, device, progress=None, cuda=None, output_components=False):
+# def old_train(model, criterion, optimizer, loader, device, progress=None, cuda=None, output_components=False):
+#     model.train()
+#     loss_all = []
+#     if output_components:
+#         components_all = []
+#     for data in loader:
+#         data = data.to(device)
+#         optimizer.zero_grad()
+#         output = model(data)
+#         if output_components:
+#             loss, components = criterion(output, data,output_components=True)
+#         else:
+#             loss = criterion(output, data)
+#         loss.backward()
+#         optimizer.step()
+#         loss_all.append(loss.item())
+#         if output_components:
+#             components_all.append([comp.detach().cpu().numpy() for comp in components])
+#         if progress is not None:
+#             postfix = {'loss': loss.item()}
+#             if cuda is not None:
+#                 util_info = nvidia_smi.nvmlDeviceGetUtilizationRates(cuda)
+#                 mem_info = nvidia_smi.nvmlDeviceGetMemoryInfo(cuda)
+#                 postfix['gpu%'] = util_info.gpu
+#                 postfix['mem%'] = mem_info.used / mem_info.total * 100
+#             progress.update()
+#             progress.set_postfix(postfix)
+#     # return mean of losses over all batches
+#     if output_components:
+#         return np.mean(loss_all), np.mean(components_all, axis=0)
+#     else:
+#         return np.mean(loss_all)
+    
+# def old_test(model, criterion, loader, device, output_components=False):
+#     model.eval()
+#     losses = []
+#     losses_comp = []
+#     for batch in loader:
+#         if output_components:
+#             pred, loss, loss_comp = old_evaluate(model, batch, criterion, device, output_components=True)
+#             losses_comp.append(loss_comp)
+#         else:
+#             pred, loss = old_evaluate(model, batch, criterion, device, output_components=False)
+#         losses.append(loss)
+#     # return mean of losses over all batches
+#     mean_loss = np.mean(losses)
+#     if output_components:
+#         mean_loss_comp = np.mean(losses_comp, axis=0)
+#         return mean_loss, mean_loss_comp
+#     else:
+#         return mean_loss
+
+    
+# def old_evaluate(model, data, criterion, device, output_components=False, reduction=None, with_initial_pos=False):
+#     model.eval()
+#     with torch.no_grad():
+#         data = data.to(device)
+#         hidden = model(data, output_hidden=True, with_initial_pos=with_initial_pos)
+#         if reduction is None:
+#             pred = hidden[-1]  
+#         else:
+#             pred = torch.tensor(reduction(hidden[-2].detach().cpu().numpy()), device=data.x.device)
+#         if output_components:
+#             loss, components = criterion(pred, data, output_components=True)
+#             loss = loss.cpu().numpy()
+#             components = list(map(lambda x: x.cpu().numpy(), components))
+#         else:
+#             loss = criterion(pred, data).cpu().numpy()
+#     if output_components:
+#         return pred.cpu().numpy(), loss, components
+#     else:
+#         return pred.cpu().numpy(), loss
+
+    
+def train(model, criterion, optimizer, data_loader, callback=lambda *_, **__: None):
     model.train()
-    loss_all = []
-    graphs_all = 0
-    if output_components:
-        components_all = []
-    for data in loader:
-        data = data.to(device)
+    loss_all, components_all = [], []
+    for batch in data_loader:
         optimizer.zero_grad()
-        output = model(data)
-        if output_components:
-            loss, components = criterion(output, data,output_components=True)
-        else:
-            loss = criterion(output, data)
+        output, loss, components = predict(model, batch, criterion)
         loss.backward()
         optimizer.step()
         loss_all.append(loss.item())
-        graphs_all += data.num_graphs
-        if output_components:
-            components_all.append([comp.detach().cpu().numpy() for comp in components])
-        if progress is not None:
-            postfix = {'loss': loss.item() / data.num_graphs}
-            if cuda is not None:
-                util_info = nvidia_smi.nvmlDeviceGetUtilizationRates(cuda)
-                mem_info = nvidia_smi.nvmlDeviceGetMemoryInfo(cuda)
-                postfix['gpu%'] = util_info.gpu
-                postfix['mem%'] = mem_info.used / mem_info.total * 100
-            progress.update()
-            progress.set_postfix(postfix)
-    if output_components:
-        return np.sum(loss_all) / graphs_all, np.sum(components_all, axis=0) / graphs_all
-    else:
-        return np.sum(loss_all) / graphs_all
+        components_all.append([comp.item() for comp in components])
+        callback(output=output, loss=loss, components=components)
+    return np.mean(loss_all), np.mean(components_all, axis=0)
     
 
-def evaluate(model, data, criterion, device, output_components=False, reduction=None, with_initial_pos=False):
+def test(model, criterion, data_loader, callback=lambda *_, **__: None):
+    with torch.no_grad():
+        model.eval()
+        loss_all, components_all = [], []
+        for batch in data_loader:
+            output, loss, components = predict(model, batch, criterion)
+            loss_all.append(loss.item())
+            components_all.append([comp.item() for comp in components])
+            callback(output=output, loss=loss, components=components)
+    return np.mean(loss_all), np.mean(components_all, axis=0)
+
+
+def preprocess_batch(model, batch):
+    if type(batch) is not Batch:
+        batch = Batch.from_data_list([batch])
+    device = next(model.parameters()).device
+    return batch.to(device)
+
+
+def predict(model, batch, criterion, **model_params):
+    if type(criterion) is not CompositeLossController:
+        criterion = CompositeLossController([criterion])
+    batch = preprocess_batch(model, batch)
+    output = model(batch, **model_params)
+    pred = output[0] if output is tuple else output
+    loss, components = criterion(pred, batch, return_components=True)
+    return output, loss, components
+    
+    
+def get_performance_metrics(model, data, G):
     model.eval()
     with torch.no_grad():
-        data = data.to(device)
-        hidden = model(data, output_hidden=True, with_initial_pos=with_initial_pos)
-        if reduction is None:
-            pred = hidden[-1]  
-        else:
-            pred = torch.tensor(reduction(hidden[-2].detach().cpu().numpy()), device=data.x.device)
-        if output_components:
-            loss, components = criterion(pred, data, output_components=True)
-            loss = loss.cpu().numpy()
-            components = list(map(lambda x: x.cpu().numpy(), components))
-        else:
-            loss = criterion(pred, data).cpu().numpy()
-        loss = round(float(loss),2)
-    if output_components:
-        return pred.cpu().numpy(), loss, components
-    else:
-        return pred.cpu().numpy(), loss
+        data = preprocess_batch(model, data)
+        stress_criterion = StressLoss()
 
+        gt = get_ground_truth(G, data)
+        raw_pred = model(data)
+        scaled_pred = rescale_with_minimized_stress(raw_pred, data)
 
+        gt_stress = stress_criterion(gt, data)
+        raw_stress = stress_criterion(raw_pred, data)
+        scaled_stress = stress_criterion(scaled_pred, data)
+
+        raw_stress_ratio = (raw_stress - gt_stress) / gt_stress
+        scaled_stress_ratio = (scaled_stress - gt_stress) / gt_stress
+
+        theta, degree, node = get_radians(scaled_pred, data, 
+                                          return_node_degrees=True,
+                                          return_node_indices=True)
+        resolution_score = get_resolution_score(theta, degree, node)
+        min_angle = get_min_angle(theta)
+    
+    return scaled_pred.cpu().numpy(), {
+        'raw_stress': raw_stress.item(),
+        'scaled_stress': scaled_stress.item(),
+        'raw_stress_ratio': raw_stress_ratio.item(), 
+        'scaled_stress_ratio': scaled_stress_ratio.item(),
+        'resolution_score': resolution_score.item(),
+        'min_angle': min_angle.item()
+    }
+    
+    
 def shuffle_rome(index_file):
     files = glob.glob('../rome/*.graphml')
     random.shuffle(files)
@@ -259,8 +315,11 @@ def load_rome(index_file):
     return G_list
 
 
-def get_ground_truth(G, prog='neato'):
-    return np.array(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values()))
+def get_ground_truth(G, data, prog='neato', scaled=True):
+    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.x.device)
+    if scaled:
+        gt = rescale_with_minimized_stress(gt, data)
+    return gt
 
 
 def graph_vis(G, node_pos, file_name=None, **kwargs):
@@ -293,20 +352,11 @@ def convert_datalist(rome):
         except ZeroDivisionError:
             continue
         edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        nodes_degree = [i[1] for i in list(G.degree(list(G.nodes)))]
-        x = torch.tensor(nodes_degree,dtype=torch.float)
+        x = torch.rand(size, 2)
         data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         data_list.append(data)
         G_list.append(G)
     return G_list, data_list
-
-
-def get_stress_minimizing_scale(pos, batch):
-    d, w = batch.edge_attr[:, 0].numpy(), batch.edge_attr[:, 1].numpy()
-    start, end = node2edge(pos, batch)
-    diff = end - start
-    dist = np.linalg.norm(diff, axis=1)
-    return (w * d * dist).sum() / (w * dist * dist).sum()
 
 
 def pca_project(vector, n=2):

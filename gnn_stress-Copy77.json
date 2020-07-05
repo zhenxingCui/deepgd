@@ -1,0 +1,24 @@
+{
+    "name": "ratio:2+ring:0.1",
+    "batchsize": 128,
+    "epoch": {
+        "start": 258,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.01,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": {
+            "start_epoch": null,
+            "target_lr": null,
+            "decay_rate": null,
+            "decay_step": null
+        }
+    },
+    "log_period": 1,
+    "test": {
+        "name": "ratio:2+ring:0.1",
+        "epoch": 409
+    }
+}

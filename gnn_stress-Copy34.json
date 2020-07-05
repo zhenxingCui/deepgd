@@ -1,0 +1,20 @@
+{
+    "name": "composite82_dir_u_8888",
+    "batchsize": 64,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.001,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": null
+    },
+    "log_period": 1,
+    "test": {
+        "name": "composite82_dir_u_8888",
+        "epoch": 1024,
+        "out_prefix": "composite82_dir_u_8888"
+    }
+}

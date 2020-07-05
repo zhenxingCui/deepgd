@@ -1,0 +1,24 @@
+{
+    "name": "sine:0.02-ring:0.15",
+    "batchsize": 128,
+    "epoch": {
+        "start": 0,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.01,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": {
+            "start_epoch": null,
+            "target_lr": null,
+            "decay_rate": null,
+            "decay_step": null
+        }
+    },
+    "log_period": 1,
+    "test": {
+        "name": "test",
+        "epoch": 505
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "name": "stress_l2_9blocks",
+    "batchsize": 128,
+    "epoch": {
+        "start": 342,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.01,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": 0.00032
+    },
+    "log_period": 1,
+    "test": {
+        "name": "stress_l2_9blocks",
+        "epoch": 344,
+        "out_prefix": "stress_l2_9blocks"
+    }
+}
