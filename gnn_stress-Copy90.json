@@ -2,7 +2,7 @@
     "name": "ratio_stress:1",
     "batchsize": 128,
     "epoch": {
-        "start": 23,
+        "start": 588,
         "end": null
     },
     "lr" : {
@@ -19,6 +19,6 @@
     "log_period": 1,
     "test": {
         "name": "test",
-        "epoch": 14
+        "epoch": 588
     }
 }

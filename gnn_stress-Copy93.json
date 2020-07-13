@@ -1,8 +1,8 @@
 {
-    "name": "ratio_stress:1+ratio_angle:0.5",
+    "name": "sa:.95:-1=ratio_str:.7+ratio_ang:.3",
     "batchsize": 128,
     "epoch": {
-        "start": 459,
+        "start": 443,
         "end": null
     },
     "lr" : {
@@ -18,7 +18,7 @@
     },
     "log_period": 1,
     "test": {
-        "name": "test",
-        "epoch": 459
+        "name": "test_min_angular",
+        "epoch": 441
     }
 }

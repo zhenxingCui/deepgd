@@ -8,3 +8,5 @@ __pycache__/
 *_test/
 *_test_old/
 *.pickle
+tensorboards/
+visualizations/

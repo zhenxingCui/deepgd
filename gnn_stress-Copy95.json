@@ -1,8 +1,8 @@
 {
-    "name": "ratio_stress:1+ratio_angle:0.5",
+    "name": "norm_stress:1",
     "batchsize": 128,
     "epoch": {
-        "start": 459,
+        "start": 0,
         "end": null
     },
     "lr" : {
@@ -19,6 +19,6 @@
     "log_period": 1,
     "test": {
         "name": "test",
-        "epoch": 459
+        "epoch": 820
     }
 }
