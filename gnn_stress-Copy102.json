@@ -1,0 +1,24 @@
+{
+    "name": "l[stress,sine]_rand-w",
+    "batchsize": 32,
+    "epoch": {
+        "start": 1,
+        "end": null
+    },
+    "lr" : {
+        "initial": 0.01,
+        "decay_rate": 0.99,
+        "decay_step": 1,
+        "override": {
+            "start_epoch": null,
+            "target_lr": null,
+            "decay_rate": null,
+            "decay_step": null
+        }
+    },
+    "log_period": 1,
+    "test": {
+        "name": "test_.9_.1",
+        "epoch": 304
+    }
+}

@@ -56,24 +56,18 @@ def generate_polygon(n, radius=1):
     return x
 
 
-def generate_randPos(n, seed=0):
-    random.seed(seed)
-    node_pos = [(random.uniform(-1, 1),
-                 random.uniform(-1, 1)) for i in range(n)]
-    x = torch.tensor(node_pos,dtype=torch.float)
-    return x
-
-
 def generate_edgelist(size):
-    return [(i, j) for i in range(size) for j in range(size) if i != j]
+    return [(i, j) 
+            for i in range(size) 
+            for j in range(size) 
+            if i != j]
 
 
 def find_intersect(segments, accurate=True):
     intersect(segments)
     
-
     
-def generate_eAttr(G, com_edge_list):
+def generate_edge_attr(G, com_edge_list):
     path_length = dict(nx.all_pairs_shortest_path_length(G))
     max_length = 0
     for source in path_length:
@@ -109,7 +103,7 @@ def generate_graph(size):
             continue
 #         nx.write_edgelist(G, file_name, data=False)
         edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_randPos(size)
+        x = generate_rand_pos(size)
         data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         return G, data
 
@@ -127,7 +121,7 @@ def generate_testgraph(size, prob):
             continue
 #         nx.write_edgelist(G, file_name, data=False)
         edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_randPos(size)
+        x = generate_rand_pos(size)
         data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         return G, data
 
@@ -160,6 +154,23 @@ def train(model, criterion, optimizer, data_loader, callback=lambda *_, **__: No
         components_all.append([comp.item() for comp in components])
         callback(output=output, loss=loss, components=components)
     return np.mean(loss_all), np.mean(components_all, axis=0)
+
+
+def train_with_dynamic_weights(model, controller, criterion, optimizer, data_loader, callback=lambda *_, **__: None):
+    model.train()
+    loss_all, components_all = [], []
+    for batch in data_loader:
+        gamma = F.normalize(torch.rand(controller.n_criteria), p=1, dim=0)
+        controller.set_gamma(gamma.tolist())
+        controller.step()
+        optimizer.zero_grad()
+        output, loss, components = predict(model, batch, criterion, weights=gamma.to(next(model.parameters()).device))
+        loss.backward()
+        optimizer.step()
+        loss_all.append(loss.item())
+        components_all.append([comp.item() for comp in components])
+        callback(output=output, loss=loss, components=components)
+    return np.mean(loss_all), np.mean(components_all, axis=0)
     
 
 def validate(model, criterion, data_loader, callback=lambda *_, **__: None):
@@ -174,7 +185,22 @@ def validate(model, criterion, data_loader, callback=lambda *_, **__: None):
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def test(model, criteria_list, dataset, idx_range, callback=lambda *_, **__: None):
+def validate_with_dynamic_weights(model, controller, criterion, data_loader, callback=lambda *_, **__: None):
+    with torch.no_grad():
+        model.eval()
+        loss_all, components_all = [], []
+        for batch in data_loader:
+            gamma = F.normalize(torch.rand(controller.n_criteria), p=1, dim=0)
+            controller.set_gamma(gamma.tolist())
+            controller.step()
+            output, loss, components = predict(model, batch, criterion, weights=gamma.to(next(model.parameters()).device))
+            loss_all.append(loss.item())
+            components_all.append([comp.item() for comp in components])
+            callback(output=output, loss=loss, components=components)
+    return np.mean(loss_all), np.mean(components_all, axis=0)
+
+
+def test(model, criteria_list, dataset, idx_range, callback=lambda *_, **__: None, **model_params):
     stress = []
     raw_stress_ratio = []
     scaled_stress_ratio = []
@@ -185,7 +211,8 @@ def test(model, criteria_list, dataset, idx_range, callback=lambda *_, **__: Non
         gt_stress = load_ground_truth_stress(idx)
         pred, metrics = get_performance_metrics(model, dataset[idx],
                                                 gt_stress=gt_stress, 
-                                                criteria_list=criteria_list)
+                                                criteria_list=criteria_list,
+                                                **model_params)
 
         stress.append(metrics['scaled_stress'])
         raw_stress_ratio.append(metrics['raw_stress_ratio'])
@@ -230,7 +257,7 @@ def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     return None
     
     
-def get_performance_metrics(model, data, gt_stress=None, criteria_list=None):
+def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **model_params):
     with torch.no_grad():
         model.eval()
         data = preprocess_batch(model, data)
@@ -240,7 +267,7 @@ def get_performance_metrics(model, data, gt_stress=None, criteria_list=None):
             gt = get_ground_truth(data)
             gt_stress = stress_criterion(gt, data)
         
-        raw_pred = model(data)
+        raw_pred = model(data, **model_params)
         raw_stress = stress_criterion(raw_pred, data)
         
         scaled_pred = rescale_with_minimized_stress(raw_pred, data)
@@ -287,8 +314,8 @@ def load_rome(index_file):
     return G_list
 
 
-def get_ground_truth(data, prog='neato', scaled=True):
-    G = torch_geometric.utils.to_networkx(data)
+def get_ground_truth(data, G, prog='neato', scaled=True):
+#     G = torch_geometric.utils.to_networkx(data)
     gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.x.device)
     if scaled:
         gt = rescale_with_minimized_stress(gt, data)

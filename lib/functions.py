@@ -1,7 +1,13 @@
 from .imports import *
 
 
-def normalize(x, return_norm=False, eps=1e-5):
+def generate_rand_pos(n, seed=None):
+    if seed is not None:
+        torch.manual_seed(seed)
+    return torch.rand(n, 2).mul(2).sub(1)
+
+
+def l2_normalize(x, return_norm=False, eps=1e-5):
     if type(x) is torch.Tensor:
         norm = x.norm(dim=1).unsqueeze(dim=1) 
     else:
@@ -11,6 +17,7 @@ def normalize(x, return_norm=False, eps=1e-5):
         return unit_vec, norm
     else:
         return unit_vec
+    
     
 def get_full_edge_index(batch):
     return batch.edge_index.T
@@ -60,7 +67,7 @@ def get_counter_clockwise_sorted_angle_vertices(edges, pos):
         pos = pos.cpu().detach().numpy()
     u, v = edges[:, 0], edges[:, 1]
     diff = pos[v] - pos[u]
-    diff_normalized = normalize(diff)
+    diff_normalized = l2_normalize(diff)
     # get cosine angle between uv and y-axis
     cos = diff_normalized @ np.array([[1],[0]])
     # get radian between uv and y-axis
@@ -84,8 +91,8 @@ def get_radians(pos, batch,
     real_edges = get_real_edge_index(batch)
     angles = get_counter_clockwise_sorted_angle_vertices(real_edges, pos)
     u, v1, v2 = angles[:, 0], angles[:, 1], angles[:, 2]
-    e1 = normalize(pos[v1] - pos[u])
-    e2 = normalize(pos[v2] - pos[u])
+    e1 = l2_normalize(pos[v1] - pos[u])
+    e2 = l2_normalize(pos[v2] - pos[u])
     radians = (e1 * e2).sum(dim=1).acos()
     result = (radians,)
     if return_node_degrees:

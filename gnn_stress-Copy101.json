@@ -2,7 +2,7 @@
     "name": "l[stress:.75,sine:.25]_sa[t:.95,b:1,p:.5]",
     "batchsize": 128,
     "epoch": {
-        "start": 67,
+        "start": 152,
         "end": null
     },
     "lr" : {
@@ -19,6 +19,6 @@
     "log_period": 1,
     "test": {
         "name": "test",
-        "epoch": 710
+        "epoch": 521
     }
 }

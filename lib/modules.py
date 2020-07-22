@@ -8,7 +8,7 @@ class SoftAdaptController:
         assert beta >= 0
         if gamma is None:
             gamma = np.ones(len(criteria))
-        self.gamma = np.array(gamma) / np.sum(gamma)
+        self.set_gamma(gamma)
         self.criteria = criteria
         self.warmup = warmup
         self.exploit_rate = exploit_rate
@@ -50,6 +50,13 @@ class SoftAdaptController:
         self.last_weights = self.weights
         self.weights = self._soft_adapt(smoothed, gamma=self.gamma, beta=self.policy*self.beta)[-1]
         self.criteria.update_weights(self.weights)
+    
+    @property
+    def n_criteria(self):
+        return len(self.criteria)
+    
+    def set_gamma(self, gamma):
+        self.gamma = np.array(gamma) / np.sum(gamma)
     
     def get_weights(self):
         return self.weights
@@ -112,6 +119,7 @@ class GNNBlock(nn.Module):
                  extra_efeat='skip', 
                  euclidian=False, 
                  direction=False, 
+                 n_weights=0,
                  residual=False):
         '''
         extra_efeat: {'skip', 'first', 'prev'}
@@ -120,6 +128,7 @@ class GNNBlock(nn.Module):
         self.extra_efeat = extra_efeat
         self.euclidian = euclidian
         self.direction = direction
+        self.n_weights = n_weights
         self.residual = residual
         self.gnn = nn.ModuleList()
         self.n_layers = len(feat_dims) - 1
@@ -128,7 +137,7 @@ class GNNBlock(nn.Module):
             direction_dim = feat_dims[idx] if self.extra_efeat == 'prev' else feat_dims[0]
             in_efeat_dim = 2
             if self.extra_efeat != 'first': 
-                in_efeat_dim += self.euclidian + self.direction * direction_dim 
+                in_efeat_dim += self.euclidian + self.direction * direction_dim + self.n_weights
             edge_net = nn.Sequential(*chain.from_iterable(
                 [nn.Linear(idim, odim),
                  nn.BatchNorm1d(odim),
@@ -145,31 +154,36 @@ class GNNBlock(nn.Module):
                                      act=act, 
                                      dp=dp))
         
-    def _get_edge_feat(self, pos, data, euclidian=False, direction=False):
+    def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
         e = data.edge_attr
         if euclidian or direction:
             start_pos, end_pos = get_full_edges(pos, data)
-            u, d = normalize(end_pos - start_pos, return_norm=True)
+            u, d = l2_normalize(end_pos - start_pos, return_norm=True)
             if euclidian:
                 e = torch.cat([e, u], dim=1)
             if direction:
                 e = torch.cat([e, d], dim=1)
+        if weights is not None:
+            w = weights.repeat(len(e), 1)
+            e = torch.cat([e, w], dim=1)
         return e
         
-    def forward(self, v, data):
+    def forward(self, v, data, weights=None):
         vres = v
         for layer in range(self.n_layers):
             vsrc = v if self.euclidian == 'prev' else vres
             get_extra = not (self.extra_efeat == 'first' and layer != 0)
+            
             e = self._get_edge_feat(vsrc, data, 
                                     euclidian=self.euclidian and get_extra, 
-                                    direction=self.direction and get_extra)
+                                    direction=self.direction and get_extra,
+                                    weights=weights if get_extra and self.n_weights > 0 else None)
             v = self.gnn[layer](v, e, data)
         return v + vres if self.residual else v
         
         
 class Model(nn.Module):
-    def __init__(self, num_blocks=9):
+    def __init__(self, num_blocks=9, n_weights=0):
         super().__init__()
         
         self.in_blocks = nn.ModuleList([
@@ -184,6 +198,7 @@ class Model(nn.Module):
                      extra_efeat='skip', 
                      euclidian=True, 
                      direction=True, 
+                     n_weights=n_weights,
                      residual=True)
             for _ in range(num_blocks)
         ])
@@ -192,19 +207,15 @@ class Model(nn.Module):
             GNNBlock(feat_dims=[8, 2], act=False)
         ])
 
-    def forward(self, data, output_hidden=False, numpy=False, with_initial_pos=False):
-        if with_initial_pos:
-            v = data.x
-        else:
-            v = torch.rand_like(data.x) * 2 - 1
-                
+    def forward(self, data, weights=None, output_hidden=False, numpy=False, with_initial_pos=False):
+        v = data.x if with_initial_pos else generate_rand_pos(len(data.x)).to(data.x.device)       
         v = rescale_with_minimized_stress(v, data)
           
         hidden = []
         for block in chain(self.in_blocks, 
                            self.hid_blocks, 
                            self.out_blocks):
-            v = block(v, data)
+            v = block(v, data, weights)
             if output_hidden:
                 hidden.append(v.detach().cpu().numpy() if numpy else v)
         if not output_hidden:
