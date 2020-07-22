@@ -1,12 +1,8 @@
-.DS_Store
-random_graph/
-test_opt_data/
-test_traingraph/
 .ipynb_checkpoints/
 __pycache__/
 *.log
-*_test/
-*_test_old/
 *.pickle
 tensorboards/
 visualizations/
+data/
+checkpoints/
