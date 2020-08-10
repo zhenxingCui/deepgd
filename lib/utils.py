@@ -4,6 +4,7 @@ from .modules import *
 from ipynb.fs.defs.losses import *
 
 
+# TODO: setitem setattr
 class Config:
     class Store:
         def __init__(self, data: dict):
@@ -57,7 +58,7 @@ def generate_polygon(n, radius=1):
 
 
 def generate_edgelist(size):
-    return [(i, j) 
+    return [(i, j)
             for i in range(size) 
             for j in range(size) 
             if i != j]
@@ -142,7 +143,9 @@ def load_processed_data(G_list_file='G_list.pickle',
     return G_list, data_list
 
     
-def train(model, criterion, optimizer, data_loader, callback=lambda *_, **__: None):
+def train(model, criterion, optimizer, data_loader, callback=None):
+    if callback is None:
+        callback = lambda *_, **__: None
     model.train()
     loss_all, components_all = [], []
     for batch in data_loader:
@@ -156,7 +159,9 @@ def train(model, criterion, optimizer, data_loader, callback=lambda *_, **__: No
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def train_with_dynamic_weights(model, controller, criterion, optimizer, data_loader, callback=lambda *_, **__: None):
+def train_with_dynamic_weights(model, controller, criterion, optimizer, data_loader, callback=None):
+    if callback is None:
+        callback = lambda *_, **__: None
     model.train()
     loss_all, components_all = [], []
     for batch in data_loader:
@@ -173,7 +178,9 @@ def train_with_dynamic_weights(model, controller, criterion, optimizer, data_loa
     return np.mean(loss_all), np.mean(components_all, axis=0)
     
 
-def validate(model, criterion, data_loader, callback=lambda *_, **__: None):
+def validate(model, criterion, data_loader, callback=None):
+    if callback is None:
+        callback = lambda *_, **__: None
     with torch.no_grad():
         model.eval()
         loss_all, components_all = [], []
@@ -185,7 +192,9 @@ def validate(model, criterion, data_loader, callback=lambda *_, **__: None):
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def validate_with_dynamic_weights(model, controller, criterion, data_loader, callback=lambda *_, **__: None):
+def validate_with_dynamic_weights(model, controller, criterion, data_loader, callback=None):
+    if callback is None:
+        callback = lambda *_, **__: None
     with torch.no_grad():
         model.eval()
         loss_all, components_all = [], []
@@ -200,7 +209,9 @@ def validate_with_dynamic_weights(model, controller, criterion, data_loader, cal
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def test(model, criteria_list, dataset, idx_range, callback=lambda *_, **__: None, **model_params):
+def test(model, criteria_list, dataset, idx_range, callback=None, **model_params):
+    if callback is None:
+        callback = lambda *_, **__: None
     stress = []
     raw_stress_ratio = []
     scaled_stress_ratio = []
@@ -224,12 +235,12 @@ def test(model, criteria_list, dataset, idx_range, callback=lambda *_, **__: Non
         callback(idx=idx, pred=pred, metrics=metrics)
     
     return {
-        "stress": torch.tensor(stress).mean(),
-        "raw_stress_ratio": torch.tensor(raw_stress_ratio).mean(),
-        "scaled_stress_ratio": torch.tensor(scaled_stress_ratio).mean(),
-        "resolution_score": torch.tensor(resolution_score).mean(),
-        "min_angle": torch.tensor(min_angle).mean(),
-        "losses": torch.tensor(losses).mean(dim=0),
+        "stress": torch.tensor(stress),
+        "raw_stress_ratio": torch.tensor(raw_stress_ratio),
+        "scaled_stress_ratio": torch.tensor(scaled_stress_ratio),
+        "resolution_score": torch.tensor(resolution_score),
+        "min_angle": torch.tensor(min_angle),
+        "losses": torch.tensor(losses),
     }
 
 
@@ -316,12 +327,17 @@ def load_rome(index_file):
 
 def get_ground_truth(data, G, prog='neato', scaled=True):
 #     G = torch_geometric.utils.to_networkx(data)
-    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.x.device)
+    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.edge_attr.device)
     if scaled:
         gt = rescale_with_minimized_stress(gt, data)
     return gt
 
 
+def get_layout(data, prog='neato'):
+    G = tg_to_nx(data)
+    pos = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).type_as(data.pos)
+
+    
 def graph_vis(G, node_pos, file_name=None, **kwargs):
     graph_attr = dict(node_size=100, 
                       with_labels=False, 
@@ -336,8 +352,46 @@ def graph_vis(G, node_pos, file_name=None, **kwargs):
     plt.figure()
     nx.draw(G, pos, **graph_attr)
     if file_name is not None:
-        plt.savefig(file_name) 
+        plt.savefig(file_name)
+        
+
+def visualize_graph(data, file_name=None, **kwargs):
+    G = tg_to_nx(data)
+    graph_attr = dict(node_size=100, 
+                      with_labels=False, 
+                      labels=dict(zip(list(G.nodes), map(lambda n: str(n), list(G.nodes)))),
+                      font_color="white", 
+                      font_weight="bold",
+                      font_size=12)
+    graph_attr.update(kwargs)
+    pos = nx.get_node_attributes(G, name='pos')
+    plt.figure()
+    nx.draw(G, pos, **graph_attr)
+    if file_name is not None:
+        plt.savefig(file_name)
     
+    
+def nx_to_tg(G, pos=None, node_feat=None, edge_feat=None, edge_label=None):
+    edge_list = generate_edgelist(G.number_of_nodes())
+    edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
+    if edge_label is not None:
+        edge_label = edge_label[edge_index[0], edge_index[1]]
+    if edge_feat is not None:
+        edge_feat = edge_feat[edge_index[0], edge_index[1]]
+    orig_edge_index = torch_geometric.utils.from_networkx(G).edge_index
+    
+    return Data(x=node_feat, 
+                pos=pos, 
+                edge_index=edge_index, 
+                edge_attr=edge_feat, 
+                y=edge_label, 
+                orig_edge_index=orig_edge_index)
+
+
+def tg_to_nx(data):
+    data = Data(edge_index=data.orig_edge_index, pos=data.pos)
+    return torch_geometric.utils.to_networkx(data, node_attrs=['pos'], to_undirected=True)
+
     
 def convert_datalist(rome):
     data_list = []

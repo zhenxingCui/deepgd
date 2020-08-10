@@ -19,6 +19,6 @@
     "log_period": 1,
     "test": {
         "name": "scaled_square:0.01",
-        "epoch": 505
+        "epoch": 569
     }
 }

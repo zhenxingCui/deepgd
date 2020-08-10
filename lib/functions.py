@@ -132,4 +132,3 @@ def rescale_with_minimized_stress(pos, batch, return_scale=False):
     if return_scale:
         return scaled_pos, scale
     return scaled_pos
-    
