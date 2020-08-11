@@ -19,6 +19,6 @@
     "log_period": 1,
     "test": {
         "name": "test",
-        "epoch": 692
+        "epoch": 535
     }
 }

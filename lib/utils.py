@@ -378,37 +378,45 @@ def nx_to_tg(G, pos=None, node_feat=None, edge_feat=None, edge_label=None):
         edge_label = edge_label[edge_index[0], edge_index[1]]
     if edge_feat is not None:
         edge_feat = edge_feat[edge_index[0], edge_index[1]]
-    orig_edge_index = torch_geometric.utils.from_networkx(G).edge_index
+    real_edge_index = torch_geometric.utils.from_networkx(G).edge_index
     
     return Data(x=node_feat, 
                 pos=pos, 
                 edge_index=edge_index, 
                 edge_attr=edge_feat, 
                 y=edge_label, 
-                orig_edge_index=orig_edge_index)
+                real_edge_index=real_edge_index)
 
 
 def tg_to_nx(data):
-    data = Data(edge_index=data.orig_edge_index, pos=data.pos)
-    return torch_geometric.utils.to_networkx(data, node_attrs=['pos'], to_undirected=True)
+    data = Data(edge_index=torch.cat([data.real_edge_index, data.real_edge_index.flip(dims=[0])], dim=1), pos=data.pos)
+    return torch_geometric.utils.to_networkx(data, 
+                                             node_attrs=['pos'] if data.pos is not None else [], 
+                                             to_undirected=True)
 
+
+def G_to_data(G):
+    size = G.number_of_nodes()
+    com_edge_list = generate_edgelist(size)
+    try:
+        edge_attr = generate_edge_attr(G, com_edge_list)
+    except KeyError:
+        return None
+    except ZeroDivisionError:
+        return None
+    edge_index = torch.tensor(com_edge_list, dtype=torch.long)
+    x = torch.rand(size, 2)
+    return Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
+    
     
 def convert_datalist(rome):
     data_list = []
     G_list = []
     for G in tqdm(rome, desc="convert_datalist"):
-        size = G.number_of_nodes()
-        com_edge_list = generate_edgelist(size)
-        try:
-            edge_attr = generate_eAttr(G, com_edge_list)
-        except KeyError:
+        data = G_to_data(G)
+        if data is None:
             continue
-        except ZeroDivisionError:
-            continue
-        edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = torch.rand(size, 2)
-        data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-        data_list.append(data)
+        data_list.append(G_to_data(G))
         G_list.append(G)
     return G_list, data_list
 
