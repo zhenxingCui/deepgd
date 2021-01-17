@@ -123,7 +123,8 @@ def get_min_angle(radians):
 
 def rescale_with_minimized_stress(pos, batch, return_scale=False):
     batch = batch.to(pos.device)
-    d, w = batch.edge_attr[:, 0], batch.edge_attr[:, 1]
+    d = batch.edge_attr[:, 0]
+    w = 1/d**2
     start, end = get_full_edges(pos, batch)
     diff = end - start
     dist = diff.norm(dim=1)
@@ -132,3 +133,34 @@ def rescale_with_minimized_stress(pos, batch, return_scale=False):
     if return_scale:
         return scaled_pos, scale
     return scaled_pos
+
+def get_adj(batch, reverse=False, value=1):
+    device = batch.x.device
+    adj = torch.zeros(batch.num_nodes, batch.num_nodes).to(device)
+    adj[tuple(batch.edge_index)] = 1
+    return (1 - adj if reverse else adj) * value
+
+# Hack: will fail for non-complete graphs
+def get_complete_adj(batch):
+    return get_adj(batch) + np.eye(batch.num_nodes)
+
+def get_shorted_path_adj(batch):
+    adj =  get_adj(batch, reverse=True, value=np.inf)
+    adj[tuple(batch.edge_index)] = batch.edge_attr[:, 0]
+    return adj
+
+def get_edge_length_adj(batch, pos):
+    adj =  get_adj(batch, reverse=True, value=np.inf)
+    adj[tuple(batch.edge_index)] = (pos[batch.edge_index[0]] - pos[batch.edge_index[1]]).norm(dim=1)
+    return adj
+
+def get_num_nodes_adj(batch):
+    adj = get_complete_adj(batch)
+    adj *= adj.sum(dim=1, keepdim=True)
+    return adj
+
+def graph_wise_normalize(batch, mat):
+    adj = get_complete_adj(batch)
+    sum_mat = adj * mat.sum(dim=0, keepdim=True)
+    sum_mat = adj * sum_mat.sum(dim=1, keepdim=True)
+    return mat / (sum_mat + 1e-5) 

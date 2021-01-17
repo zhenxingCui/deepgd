@@ -68,25 +68,19 @@ def find_intersect(segments, accurate=True):
     intersect(segments)
     
     
-def generate_edge_attr(G, com_edge_list):
+def generate_edge_attr(G, com_edge_list, node_id_map=lambda i: f"n{i}"):
     path_length = dict(nx.all_pairs_shortest_path_length(G))
-    max_length = 0
-    for source in path_length:
-        for target in path_length[source]:
-            if path_length[source][target] > max_length:
-                max_length = path_length[source][target]
-    L = 1 
-    K = 1
+#     max_length = 0
+#     for source in path_length:
+#         for target in path_length[source]:
+#             if path_length[source][target] > max_length:
+#                 max_length = path_length[source][target]
     edge_attr = []
     for i in com_edge_list:
-        start = "n" + str(i[0])
-        end = "n" + str(i[1])
-        d = path_length[start][end]
-        l = L * d #l = L * d
-        k = K/(d**2) 
-        start_degree = G.degree(start)
-#         end_degree = G.degree(end)
-        edge_attr.append([l,k])
+        start = node_id_map(i[0])
+        end = node_id_map(i[1])
+        l = path_length[start][end]
+        edge_attr.append([l])
     out = torch.tensor(edge_attr, dtype=torch.float)
     return out
 
@@ -129,13 +123,14 @@ def generate_testgraph(size, prob):
     
 def load_processed_data(G_list_file='G_list.pickle', 
                         data_list_file='data_list.pickle', 
-                        index_file='data_index.txt'):
+                        index_file='data_index.txt',
+                        data_path=None):
     if os.path.isfile(G_list_file) and os.path.isfile(data_list_file):
         G_list = pickle.load(open(G_list_file, 'rb'))
         data_list = pickle.load(open(data_list_file, 'rb'))
     else:
         if not os.path.isfile(index_file):
-            shuffle_rome(index_file)
+            shuffle_rome(data_path=data_path, index_file=index_file)
         rome = load_rome(index_file)
         G_list, data_list = convert_datalist(rome)
         pickle.dump(G_list, open(G_list_file, 'wb'))
@@ -306,23 +301,49 @@ def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **m
         'min_angle': min_angle.item(),
         'losses': list(map(torch.Tensor.item, losses))
     }
+
+
+
+
+def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None, **model_params):
+    if type(data) is not Batch:
+        data = Batch.from_data_list([data])
+        
+    stress_criterion = StressLoss()
+
+    if gt_stress is None:
+        gt = get_ground_truth(data, G)
+        gt_stress = stress_criterion(gt, data)
+
+    if criteria_list is not None:
+        other_criteria = CompositeLoss(criteria_list)
+        _, gt_losses = other_criteria(gt, data, return_components=True)
+
+    
+    return {
+        'gt_stress': gt_stress.item(),
+        'gt_losses': list(map(torch.Tensor.item, gt_losses))
+    }
     
     
-def shuffle_rome(index_file):
-    files = glob.glob('../rome/*.graphml')
+def shuffle_rome(data_path='data/rome', index_file='data_index.txt'):
+    files = glob.glob(f'{data_path}/*.graphml')
     random.shuffle(files)
     with open(index_file, "w") as fout:
         for f in files:
             print(f, file=fout)
 
             
-def load_rome(index_file):
+def load_rome(index_file, idx=slice(None)):
+    all_files = open(index_file).read().splitlines()
+    if type(idx) is int:
+        file_list = [all_files[idx]]
+    else:
+        file_list = all_files[idx]
     G_list = []
-    count = 0
-    for file in tqdm(open(index_file).read().splitlines(), desc="load_rome"):
-        G = nx.read_graphml(file)
-        G_list.append(G)
-    return G_list
+    for file in tqdm(file_list, desc="load_rome"):
+        G_list.append(nx.read_graphml(file))
+    return G_list[0] if type(idx) is int else G_list
 
 
 def get_ground_truth(data, G, prog='neato', scaled=True):
@@ -341,16 +362,17 @@ def get_layout(data, prog='neato'):
 def graph_vis(G, node_pos, file_name=None, **kwargs):
     graph_attr = dict(node_size=100, 
                       with_labels=False, 
-                      labels=dict(zip(list(G.nodes), map(lambda n: n[1:], list(G.nodes)))),
+                      labels=dict(zip(list(G.nodes), map(lambda n: n if type(n) is int else n[1:], list(G.nodes)))),
                       font_color="white", 
                       font_weight="bold",
                       font_size=12)
     graph_attr.update(kwargs)
     for i, (n, p) in enumerate(node_pos):
-        G.nodes[f'n{i}']['pos'] = n, p
+        G.nodes[i]['pos'] = n, p
     pos = nx.get_node_attributes(G, name='pos')
     plt.figure()
     nx.draw(G, pos, **graph_attr)
+    plt.axis('equal')
     if file_name is not None:
         plt.savefig(file_name)
         
@@ -398,12 +420,7 @@ def tg_to_nx(data):
 def G_to_data(G):
     size = G.number_of_nodes()
     com_edge_list = generate_edgelist(size)
-    try:
-        edge_attr = generate_edge_attr(G, com_edge_list)
-    except KeyError:
-        return None
-    except ZeroDivisionError:
-        return None
+    edge_attr = generate_edge_attr(G, com_edge_list)
     edge_index = torch.tensor(com_edge_list, dtype=torch.long)
     x = torch.rand(size, 2)
     return Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
@@ -413,9 +430,9 @@ def convert_datalist(rome):
     data_list = []
     G_list = []
     for G in tqdm(rome, desc="convert_datalist"):
-        data = G_to_data(G)
-        if data is None:
+        if not nx.is_connected(G):
             continue
+        data = G_to_data(G)
         data_list.append(G_to_data(G))
         G_list.append(G)
     return G_list, data_list
