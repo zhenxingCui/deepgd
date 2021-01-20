@@ -210,6 +210,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, **model_params
     stress = []
     raw_stress_ratio = []
     scaled_stress_ratio = []
+    scaled_stress_spc = []
     resolution_score = []
     min_angle = []
     losses = []
@@ -223,6 +224,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, **model_params
         stress.append(metrics['scaled_stress'])
         raw_stress_ratio.append(metrics['raw_stress_ratio'])
         scaled_stress_ratio.append(metrics['scaled_stress_ratio'])
+        scaled_stress_spc.append(metrics['scaled_stress_spc'])
         resolution_score.append(metrics['resolution_score'])
         min_angle.append(metrics['min_angle'])
         losses.append(metrics['losses'])
@@ -233,6 +235,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, **model_params
         "stress": torch.tensor(stress),
         "raw_stress_ratio": torch.tensor(raw_stress_ratio),
         "scaled_stress_ratio": torch.tensor(scaled_stress_ratio),
+        "scaled_stress_spc": torch.tensor(scaled_stress_spc),
         "resolution_score": torch.tensor(resolution_score),
         "min_angle": torch.tensor(min_angle),
         "losses": torch.tensor(losses),
@@ -285,6 +288,7 @@ def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **m
 
         raw_stress_ratio = (raw_stress - gt_stress) / gt_stress
         scaled_stress_ratio = (scaled_stress - gt_stress) / gt_stress
+        scaled_stress_spc = (scaled_stress - gt_stress) / torch.maximum(gt_stress, scaled_stress)
 
         theta, degree, node = get_radians(scaled_pred, data, 
                                           return_node_degrees=True,
@@ -297,6 +301,7 @@ def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **m
         'scaled_stress': scaled_stress.item(),
         'raw_stress_ratio': raw_stress_ratio.item(), 
         'scaled_stress_ratio': scaled_stress_ratio.item(),
+        'scaled_stress_spc': scaled_stress_spc.item(),
         'resolution_score': resolution_score.item(),
         'min_angle': min_angle.item(),
         'losses': list(map(torch.Tensor.item, losses))
