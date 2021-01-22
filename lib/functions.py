@@ -123,7 +123,7 @@ def get_min_angle(radians):
 
 def rescale_with_minimized_stress(pos, batch, return_scale=False):
     batch = batch.to(pos.device)
-    d = batch.edge_attr[:, 0]
+    d = batch.full_edge_attr[:, 0]
     w = 1/d**2
     start, end = get_full_edges(pos, batch)
     diff = end - start
