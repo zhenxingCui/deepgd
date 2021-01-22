@@ -20,7 +20,12 @@ def l2_normalize(x, return_norm=False, eps=1e-5):
     
     
 def get_full_edge_index(batch):
-    return batch.edge_index.T
+    size = len(batch.x)
+    elist = [(i, j)
+             for i in range(size) 
+             for j in range(size) 
+             if i != j]
+    return torch.tensor(elist).to(batch.device)
     
     
 def get_real_edge_index(batch):
