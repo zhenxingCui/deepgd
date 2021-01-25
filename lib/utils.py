@@ -53,90 +53,13 @@ class Config:
 def generate_polygon(n, radius=1):
     node_pos = [(radius * np.cos(2 * np.pi * i / n),
                  radius * np.sin(2 * np.pi * i / n)) for i in range(n)]
-    x = torch.tensor(node_pos,dtype=torch.float)
+    x = torch.tensor(node_pos, dtype=torch.float)
     return x
-
-
-def generate_edgelist(size):
-    return [(i, j)
-            for i in range(size) 
-            for j in range(size) 
-            if i != j]
 
 
 def find_intersect(segments, accurate=True):
     intersect(segments)
     
-    
-def generate_edge_attr(G, com_edge_list, node_id_map=lambda i: f"n{i}"):
-    path_length = dict(nx.all_pairs_shortest_path_length(G))
-#     max_length = 0
-#     for source in path_length:
-#         for target in path_length[source]:
-#             if path_length[source][target] > max_length:
-#                 max_length = path_length[source][target]
-    edge_attr = []
-    for i in com_edge_list:
-        start = node_id_map(i[0])
-        end = node_id_map(i[1])
-        l = path_length[start][end]
-        edge_attr.append([l])
-    out = torch.tensor(edge_attr, dtype=torch.float)
-    return out
-
-
-def generate_graph(size):
-    while True:
-        G = nx.binomial_graph(size, random.uniform(0,0.2),directed=False)
-#         G = nx.random_powerlaw_tree(size,3,tries=10000)
-        com_edge_list = generate_edgelist(size)
-        try:
-            edge_attr = generate_eAttr(G, com_edge_list)
-        except KeyError:
-            continue
-        except ZeroDivisionError:
-            continue
-#         nx.write_edgelist(G, file_name, data=False)
-        edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_rand_pos(size)
-        data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-        return G, data
-
-    
-def generate_testgraph(size, prob):
-    while True:
-        G = nx.binomial_graph(size, prob,directed=False)
-#         G = nx.random_powerlaw_tree(size,3,tries=10000)
-        com_edge_list = generate_edgelist(size)
-        try:
-            edge_attr = generate_eAttr(G, com_edge_list)
-        except KeyError:
-            continue
-        except ZeroDivisionError:
-            continue
-#         nx.write_edgelist(G, file_name, data=False)
-        edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-        x = generate_rand_pos(size)
-        data = Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-        return G, data
-
-    
-def load_processed_data(G_list_file='G_list.pickle', 
-                        data_list_file='data_list.pickle', 
-                        index_file='data_index.txt',
-                        data_path=None):
-    if os.path.isfile(G_list_file) and os.path.isfile(data_list_file):
-        G_list = pickle.load(open(G_list_file, 'rb'))
-        data_list = pickle.load(open(data_list_file, 'rb'))
-    else:
-        if not os.path.isfile(index_file):
-            shuffle_rome(data_path=data_path, index_file=index_file)
-        rome = load_rome(index_file)
-        G_list, data_list = convert_datalist(rome)
-        pickle.dump(G_list, open(G_list_file, 'wb'))
-        pickle.dump(data_list, open(data_list_file, 'wb'))
-    return G_list, data_list
-
     
 def train(model, criterion, optimizer, data_loader, callback=None):
     if callback is None:
@@ -308,8 +231,6 @@ def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **m
     }
 
 
-
-
 def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None, **model_params):
     if type(data) is not Batch:
         data = Batch.from_data_list([data])
@@ -330,39 +251,6 @@ def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None,
         'gt_losses': list(map(torch.Tensor.item, gt_losses))
     }
     
-    
-def shuffle_rome(data_path='data/rome', index_file='data_index.txt'):
-    files = glob.glob(f'{data_path}/*.graphml')
-    random.shuffle(files)
-    with open(index_file, "w") as fout:
-        for f in files:
-            print(f, file=fout)
-
-            
-def load_rome(index_file, idx=slice(None)):
-    all_files = open(index_file).read().splitlines()
-    if type(idx) is int:
-        file_list = [all_files[idx]]
-    else:
-        file_list = all_files[idx]
-    G_list = []
-    for file in tqdm(file_list, desc="load_rome"):
-        G_list.append(nx.read_graphml(file))
-    return G_list[0] if type(idx) is int else G_list
-
-
-def get_ground_truth(data, G, prog='neato', scaled=True):
-#     G = torch_geometric.utils.to_networkx(data)
-    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.edge_attr.device)
-    if scaled:
-        gt = rescale_with_minimized_stress(gt, data)
-    return gt
-
-
-def get_layout(data, prog='neato'):
-    G = tg_to_nx(data)
-    pos = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).type_as(data.pos)
-
     
 def graph_vis(G, node_pos, file_name=None, **kwargs):
     graph_attr = dict(node_size=100, 
@@ -398,51 +286,6 @@ def visualize_graph(data, file_name=None, **kwargs):
         plt.savefig(file_name)
     
     
-def nx_to_tg(G, pos=None, node_feat=None, edge_feat=None, edge_label=None):
-    edge_list = generate_edgelist(G.number_of_nodes())
-    edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
-    if edge_label is not None:
-        edge_label = edge_label[edge_index[0], edge_index[1]]
-    if edge_feat is not None:
-        edge_feat = edge_feat[edge_index[0], edge_index[1]]
-    real_edge_index = torch_geometric.utils.from_networkx(G).edge_index
-    
-    return Data(x=node_feat, 
-                pos=pos, 
-                edge_index=edge_index, 
-                edge_attr=edge_feat, 
-                y=edge_label, 
-                real_edge_index=real_edge_index)
-
-
-def tg_to_nx(data):
-    data = Data(edge_index=torch.cat([data.real_edge_index, data.real_edge_index.flip(dims=[0])], dim=1), pos=data.pos)
-    return torch_geometric.utils.to_networkx(data, 
-                                             node_attrs=['pos'] if data.pos is not None else [], 
-                                             to_undirected=True)
-
-
-def G_to_data(G):
-    size = G.number_of_nodes()
-    com_edge_list = generate_edgelist(size)
-    edge_attr = generate_edge_attr(G, com_edge_list)
-    edge_index = torch.tensor(com_edge_list, dtype=torch.long)
-    x = torch.rand(size, 2)
-    return Data(x=x, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-    
-    
-def convert_datalist(rome):
-    data_list = []
-    G_list = []
-    for G in tqdm(rome, desc="convert_datalist"):
-        if not nx.is_connected(G):
-            continue
-        data = G_to_data(G)
-        data_list.append(G_to_data(G))
-        G_list.append(G)
-    return G_list, data_list
-
-
 def pca_project(vector, n=2):
     if vector.shape[1] == n:
         return vector

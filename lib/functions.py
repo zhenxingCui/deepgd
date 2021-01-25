@@ -134,6 +134,14 @@ def rescale_with_minimized_stress(pos, batch, return_scale=False):
         return scaled_pos, scale
     return scaled_pos
 
+
+def get_ground_truth(data, G, prog='neato', scaled=True):
+    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.edge_attr.device)
+    if scaled:
+        gt = rescale_with_minimized_stress(gt, data)
+    return gt
+
+
 def get_adj(batch, reverse=False, value=1):
     device = batch.x.device
     adj = torch.zeros(batch.num_nodes, batch.num_nodes).to(device)
