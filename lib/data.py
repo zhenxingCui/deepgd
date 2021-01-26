@@ -49,9 +49,40 @@ def load_G_list(data_path=None, index_file=None, data_slice=slice(None)):
 
 
 @cache
-def generate_data_list(G, sparse=False, device='cpu'):
-    def generate_random_pivots(G):
-        return random.sample(list(G.nodes), int(np.round(np.sqrt(G.number_of_nodes()))))
+def generate_data_list(G, sparse=False, pivot_mode='random', device='cpu'):
+    def generate_pivots(G, apsp, k=None, mode='random'):
+        def generate_random_pivots(G, apsp, k):
+            return random.sample(list(G.nodes), k)
+
+        def generate_mis_pivots(G, apsp, k):
+            diameter = apsp.max()
+            k = int(np.floor(np.log2(diameter)))
+            V = [[] for _ in range(k)]
+            V[0] = list(G.nodes)
+            for i in range(1, k):
+                d = 2 ** (i - 1) + 1
+                V_star = list(V[i-1])
+                while len(V_star) > 0:
+                    random.shuffle(V_star)
+                    p = V_star.pop()
+                    V[i].append(p)
+                    V_star = [v for v in V_star if apsp[p, v] >= d]
+            return V[-1]
+
+        def generate_maxmin_pivots(G, apsp, k):
+            nodes = list(G.nodes)
+            pivots = [random.choice(nodes)]
+            for _ in range(k - 1):
+                pivots.append(np.argmax([np.min(list(map(lambda p: apsp[i, p], pivots))) for i in nodes]))
+            return pivots
+        
+        methods = {
+            'random': generate_random_pivots,
+            'mis': generate_mis_pivots,
+            'maxmin': generate_maxmin_pivots,
+        }
+        
+        return methods[mode](G, apsp, k)
     
     def generate_full_edge_list(G):
         n = G.number_of_nodes()
@@ -73,12 +104,13 @@ def generate_data_list(G, sparse=False, device='cpu'):
         return sorted(list(elist))
     
     def generate_apsp(G):
-        return dict(nx.all_pairs_shortest_path_length(G))
+        apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
+        return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
     
     def generate_full_edge_attr(G, full_elist, apsp):
         edge_attr = []
         for start, end in full_elist:
-            d = apsp[start][end]
+            d = apsp[start, end]
             w = 1 / d**2
             edge_attr.append((d, w))
         return edge_attr
@@ -88,19 +120,19 @@ def generate_data_list(G, sparse=False, device='cpu'):
         groups = {p: [] for p in pivots}
         wdict = {i: {j: 1 for j in G.nodes} for i in G.nodes}
         for i in G.nodes:
-            pivot = pivots[np.argmin([apsp[i][p] for p in pivots])]
+            pivot = pivots[np.argmin([apsp[i, p] for p in pivots])]
             groups[pivot].append(i)
         for p in pivots:
             for i in G.nodes:
                 if p != i:
                     group = groups[p]
-                    d = apsp[p][i]
-                    s = np.sum((2 * np.array([apsp[p][j] for j in group])) <= d)
+                    d = apsp[p, i]
+                    s = np.sum((2 * np.array([apsp[p, j] for j in group])) <= d)
                     w = s / d**2
                     wdict[p][i] = w
         edge_attr = []
         for i, j in sparse_elist:
-            d = apsp[i][j]
+            d = apsp[i, j]
             w = wdict[i][j]
             edge_attr.append((d, w))
         return edge_attr
@@ -118,7 +150,8 @@ def generate_data_list(G, sparse=False, device='cpu'):
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     if sparse:
-        pivots = generate_random_pivots(G)
+        k = int(np.round(np.sqrt(G.number_of_nodes())))
+        pivots = generate_pivots(G, apsp, k, pivot_mode)
         sparse_elist = generate_sparse_edge_list(G, pivots)
         sparse_eattr = generate_sparse_edge_attr(G, sparse_elist, apsp, pivots)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
