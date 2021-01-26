@@ -50,6 +50,50 @@ class Config:
         return str(self[None])
     
 
+class StaticConfig:
+    class Store:
+        def __init__(self, data: dict):
+            def wrap(kvpair):
+                key, value = kvpair
+                if type(value) is dict:
+                    return key, Config.Store(data=value)
+                return kvpair
+            self.__dict__ = dict(map(wrap, data.items()))
+
+        def __getitem__(self, item):
+            def unwrap(kvpair):
+                key, value = kvpair
+                if type(value) is Config.Store:
+                    return key, value[...]
+                return kvpair
+            if item is ...:
+                return dict(map(unwrap, self.__dict__.items()))
+            return self.__dict__[item]
+
+        def __repr__(self):
+            return pformat(self.__dict__)#, sort_dicts=False)
+
+        def __str__(self):
+            return str(self.__dict__)
+        
+    def __init__(self, data):
+        self.data = Config.Store(data)
+        
+    def __getitem__(self, item):
+        if item is None:
+            return self.data
+        return self.data[item]
+    
+    def __getattr__(self, attr):
+        return self[attr]
+    
+    def __repr__(self):
+        return pformat(self[None])#, sort_dicts=False)
+    
+    def __str__(self):
+        return str(self[None])
+    
+
 def generate_polygon(n, radius=1):
     node_pos = [(radius * np.cos(2 * np.pi * i / n),
                  radius * np.sin(2 * np.pi * i / n)) for i in range(n)]
