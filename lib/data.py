@@ -26,7 +26,7 @@ def generate_random_index(data_path='data/rome',
             
             
 @cache
-def load_G_list(data_path=None, index_file=None, data_slice=slice(None)):
+def load_G_list(*, data_path=None, index_file=None, data_slice=slice(None)):
     if index_file is not None:
         all_files = open(index_file).read().splitlines()
     elif data_path is not None:
@@ -49,7 +49,7 @@ def load_G_list(data_path=None, index_file=None, data_slice=slice(None)):
 
 
 @cache
-def generate_data_list(G, sparse=False, pivot_mode='random', device='cpu'):
+def generate_data_list(G, *, sparse=False, pivot_mode='random', device='cpu'):
     def generate_pivots(G, apsp, k=None, mode='random'):
         def generate_random_pivots(G, apsp, k):
             return random.sample(list(G.nodes), k)
@@ -141,7 +141,8 @@ def generate_data_list(G, sparse=False, pivot_mode='random', device='cpu'):
         return torch.rand(G.number_of_nodes(), 2)
     
     if type(G) is list:
-        return [generate_data_list(g, sparse, device) for g in tqdm(G, desc='preprocess G')]
+        return [generate_data_list(g, sparse=sparse, pivot_mode=pivot_mode, device=device)
+                for g in tqdm(G, desc='preprocess G')]
     apsp = generate_apsp(G)
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_full_edge_attr(G, full_elist, apsp)
@@ -151,7 +152,7 @@ def generate_data_list(G, sparse=False, pivot_mode='random', device='cpu'):
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     if sparse:
         k = int(np.round(np.sqrt(G.number_of_nodes())))
-        pivots = generate_pivots(G, apsp, k, pivot_mode)
+        pivots = generate_pivots(G, apsp, k, mode=pivot_mode)
         sparse_elist = generate_sparse_edge_list(G, pivots)
         sparse_eattr = generate_sparse_edge_attr(G, sparse_elist, apsp, pivots)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
