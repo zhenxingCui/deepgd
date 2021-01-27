@@ -22,11 +22,13 @@ def l2_normalize(x, return_norm=False, eps=1e-5):
 def get_full_edge_index(batch):
     return batch.full_edge_index.T
 
+
 def get_sparse_edge_index(batch):
     return batch.sparse_edge_index.T
     
+    
 def get_real_edge_index(batch):
-    l = batch.edge_attr[:, 0]
+    l = batch.full_edge_attr[:, 0]
     return get_full_edge_index(batch)[l == l.min()]
 
 
