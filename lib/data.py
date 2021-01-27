@@ -147,7 +147,7 @@ def generate_data_list(G, *, sparse=False, k_fn=None, pivot_mode='random', devic
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_full_edge_attr(G, full_elist, apsp)
     x = generate_initial_node_attr(G)
-    data = Data(x=x, 
+    data = Data(x=x.to(device), 
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     if sparse:
