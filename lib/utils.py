@@ -255,7 +255,7 @@ def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **m
 
         raw_stress_ratio = (raw_stress - gt_stress) / gt_stress
         scaled_stress_ratio = (scaled_stress - gt_stress) / gt_stress
-        scaled_stress_spc = (scaled_stress - gt_stress) / torch.maximum(gt_stress, scaled_stress)
+        scaled_stress_spc = (scaled_stress - gt_stress) / np.maximum(gt_stress, scaled_stress.cpu().numpy())
 
         theta, degree, node = get_radians(scaled_pred, data, 
                                           return_node_degrees=True,
