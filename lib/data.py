@@ -163,7 +163,7 @@ def generate_data_list(G, *,
         return [generate_data_list(g,
                                    sparse=sparse,
                                    pivot_mode=pivot_mode,
-                                   init_node=init_node
+                                   init_node=init_node,
                                    model_eidx=model_eidx,
                                    model_eattr=model_eattr,
                                    pmds_list=pmds_list[i],
