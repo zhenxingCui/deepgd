@@ -147,7 +147,7 @@ class GNNLayer(nn.Module):
         self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
         
     def forward(self, v, e, data):
-        v = self.conv(v, data.sparse_edge_index, e)
+        v = self.conv(v, data.model_edge_index, e)
         v = self.bn(v)
         v = self.act(v)
         v = self.dp(v)
@@ -202,7 +202,7 @@ class GNNBlock(nn.Module):
                                      dp=dp))
         
     def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
-        e = data.sparse_edge_attr[:, :self.static_efeats]
+        e = data.model_edge_attr[:, :self.static_efeats]
         if euclidian or direction:
             start_pos, end_pos = get_sparse_edges(pos, data)
             u, d = l2_normalize(end_pos - start_pos, return_norm=True)
@@ -319,7 +319,7 @@ class GNNBlockForEdgePrediction(nn.Module):
                                      dp=dp))
         
     def _get_edge_feat(self, pos, data, euclidian=False, direction=False):
-        e = torch.zeros(len(data.sparse_edge_index), 0) if data.sparse_edge_attr is None else data.sparse_edge_attr
+        e = torch.zeros(len(data.model_edge_index), 0) if data.model_edge_attr is None else data.model_edge_attr
         if euclidian or direction:
             start_pos, end_pos = get_full_edges(pos, data)
             u, d = l2_normalize(end_pos - start_pos, return_norm=True)

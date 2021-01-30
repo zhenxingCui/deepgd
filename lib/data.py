@@ -50,7 +50,12 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
 
 
 @cache
-def generate_data_list(G, *, sparse=False, pivot_mode='random', pivot_weight=True, device='cpu'):
+def generate_data_list(G, *, 
+                       sparse=False, 
+                       pivot_mode='random', 
+                       model_eidx='full_edge_index', 
+                       model_eattr='full_edge_attr', 
+                       device='cpu'):
     def generate_pivots(G, apsp, k=None, mode='random'):
         def generate_random_pivots(G, apsp, k):
             return random.sample(list(G.nodes), k)
@@ -142,7 +147,12 @@ def generate_data_list(G, *, sparse=False, pivot_mode='random', pivot_weight=Tru
         return torch.rand(G.number_of_nodes(), 2)
     
     if type(G) is list:
-        return [generate_data_list(g, sparse=sparse, pivot_mode=pivot_mode, pivot_weight=pivot_weight, device=device)
+        return [generate_data_list(g,
+                                   sparse=sparse,
+                                   pivot_mode=pivot_mode,
+                                   model_eidx=model_eidx,
+                                   model_eattr=model_eattr,
+                                   device=device)
                 for g in tqdm(G, desc='preprocess G')]
     n = G.number_of_nodes()
     apsp = generate_apsp(G)
@@ -163,10 +173,11 @@ def generate_data_list(G, *, sparse=False, pivot_mode='random', pivot_weight=Tru
             k = sparse(G)
         pivots = generate_pivots(G, apsp, int(k), mode=pivot_mode)
         sparse_elist = generate_sparse_edge_list(G, pivots)
-        if pivot_weight:
-            sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots)
-        else:
-            sparse_eattr = generate_regular_edge_attr(G, sparse_elist, apsp)
+        sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots)
+        sparse_eattr_reg = generate_regular_edge_attr(G, sparse_elist, apsp)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
         data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
+        data.sparse_edge_attr_reg = torch.tensor(sparse_eattr_reg, dtype=torch.float, device=device)
+    data.model_edge_index = getattr(data, model_eidx)
+    data.model_edge_attr = getattr(data, model_eattr)
     return data
