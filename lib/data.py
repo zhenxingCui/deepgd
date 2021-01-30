@@ -29,7 +29,7 @@ def generate_random_index(data_path='data/rome',
 @cache
 def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
     if index_file is not None:
-        all_files = list(map(lambda f: f'{data_path}/{f}', open(index_file).read().splitlines()))
+        all_files = [f'{data_path}/{f}' for f in open(index_file).read().splitlines() if f.rstrip()]
     elif data_path is not None:
         all_files = sorted(glob.glob(f'{data_path}/*.graphml'), 
                            key=lambda x: int(re.search('(?<=grafo)\d+(?=\.)', x).group(0)))
@@ -41,6 +41,7 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
         file_list = all_files[data_slice]
     G_list = []
     for file in tqdm(file_list, desc=f"load G from {data_path}"):
+        print(file)
         G = nx.read_graphml(file)
         if nx.is_connected(G):
             mapping = {node: int(node[1:]) for node in G.nodes}
