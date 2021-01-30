@@ -50,7 +50,7 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
 
 
 @cache
-def generate_data_list(G, *, sparse=False, pivot_mode='random', device='cpu'):
+def generate_data_list(G, *, sparse=False, pivot_mode='random', pivot_weight=True, device='cpu'):
     def generate_pivots(G, apsp, k=None, mode='random'):
         def generate_random_pivots(G, apsp, k):
             return random.sample(list(G.nodes), k)
@@ -108,15 +108,15 @@ def generate_data_list(G, *, sparse=False, pivot_mode='random', device='cpu'):
         apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
         return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
     
-    def generate_full_edge_attr(G, full_elist, apsp):
+    def generate_regular_edge_attr(G, elist, apsp):
         edge_attr = []
-        for start, end in full_elist:
+        for start, end in elist:
             d = apsp[start, end]
             w = 1 / d**2
             edge_attr.append((d, w))
         return edge_attr
     
-    def generate_sparse_edge_attr(G, sparse_elist, apsp, pivots):
+    def generate_pivot_edge_attr(G, sparse_elist, apsp, pivots):
         # TODO: break ties
         groups = {p: [] for p in pivots}
         wdict = {i: {j: 1 for j in G.nodes} for i in G.nodes}
@@ -142,12 +142,12 @@ def generate_data_list(G, *, sparse=False, pivot_mode='random', device='cpu'):
         return torch.rand(G.number_of_nodes(), 2)
     
     if type(G) is list:
-        return [generate_data_list(g, sparse=sparse, pivot_mode=pivot_mode, device=device)
+        return [generate_data_list(g, sparse=sparse, pivot_mode=pivot_mode, pivot_weight=pivot_weight, device=device)
                 for g in tqdm(G, desc='preprocess G')]
     n = G.number_of_nodes()
     apsp = generate_apsp(G)
     full_elist = generate_full_edge_list(G)
-    full_eattr = generate_full_edge_attr(G, full_elist, apsp)
+    full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
     x = generate_initial_node_attr(G)
     data = Data(x=x.to(device), 
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
@@ -163,7 +163,10 @@ def generate_data_list(G, *, sparse=False, pivot_mode='random', device='cpu'):
             k = sparse(G)
         pivots = generate_pivots(G, apsp, int(k), mode=pivot_mode)
         sparse_elist = generate_sparse_edge_list(G, pivots)
-        sparse_eattr = generate_sparse_edge_attr(G, sparse_elist, apsp, pivots)
+        if pivot_weight:
+            sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots)
+        else:
+            sparse_eattr = generate_regular_edge_attr(G, sparse_elist, apsp)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
         data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
     return data
