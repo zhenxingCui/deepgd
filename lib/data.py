@@ -53,8 +53,10 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
 def generate_data_list(G, *, 
                        sparse=False, 
                        pivot_mode='random', 
+                       init_node='random',
                        model_eidx='full_edge_index', 
-                       model_eattr='full_edge_attr', 
+                       model_eattr='full_edge_attr',
+                       pmds_list=None,
                        device='cpu'):
     def generate_pivots(G, apsp, k=None, mode='random'):
         def generate_random_pivots(G, apsp, k):
@@ -143,22 +145,35 @@ def generate_data_list(G, *,
             edge_attr.append((d, w))
         return edge_attr
     
-    def generate_initial_node_attr(G):
-        return torch.rand(G.number_of_nodes(), 2)
+    def generate_initial_node_attr(G, mode='random'):
+        def generate_random_node_attr(G):
+            return torch.rand(G.number_of_nodes(), 2)
+        
+        def generate_pmds_node_attr(G):
+            return torch.tensor(pmds_list)
+        
+        methods = {
+            'random': generate_random_pivots,
+            'pmds': generate_mis_pivots,
+        }
+        
+        return methods[mode](G)
     
     if type(G) is list:
         return [generate_data_list(g,
                                    sparse=sparse,
                                    pivot_mode=pivot_mode,
+                                   init_node=init_node
                                    model_eidx=model_eidx,
                                    model_eattr=model_eattr,
+                                   pmds_list=pmds_list[i],
                                    device=device)
-                for g in tqdm(G, desc='preprocess G')]
+                for i, g in enumerate(tqdm(G, desc='preprocess G'))]
     n = G.number_of_nodes()
     apsp = generate_apsp(G)
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
-    x = generate_initial_node_attr(G)
+    x = generate_initial_node_attr(G, mode=init_node)
     data = Data(x=x.to(device), 
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
