@@ -204,7 +204,7 @@ class GNNBlock(nn.Module):
     def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
         e = data.model_edge_attr[:, :self.static_efeats]
         if euclidian or direction:
-            start_pos, end_pos = get_sparse_edges(pos, data)
+            start_pos, end_pos = get_model_edges(pos, data)
             u, d = l2_normalize(end_pos - start_pos, return_norm=True)
             if euclidian:
                 e = torch.cat([e, u], dim=1)
@@ -272,74 +272,74 @@ class Model(nn.Module):
         return hidden if output_hidden else vout
     
     
-class GNNBlockForEdgePrediction(nn.Module):
-    def __init__(self, feat_dims, 
-                 efeat_hid_dims=[], 
-                 efeat_hid_acts=nn.LeakyReLU,
-                 bn=False, 
-                 act=True, 
-                 dp=None, 
-                 n_edge_attr=0,
-                 extra_efeat='skip',
-                 euclidian=False, 
-                 direction=False,
-                 residual=False):
-        '''
-        extra_efeat: {'skip', 'first', 'prev'}
-        '''
-        super().__init__()
+# class GNNBlockForEdgePrediction(nn.Module):
+#     def __init__(self, feat_dims, 
+#                  efeat_hid_dims=[], 
+#                  efeat_hid_acts=nn.LeakyReLU,
+#                  bn=False, 
+#                  act=True, 
+#                  dp=None, 
+#                  n_edge_attr=0,
+#                  extra_efeat='skip',
+#                  euclidian=False, 
+#                  direction=False,
+#                  residual=False):
+#         '''
+#         extra_efeat: {'skip', 'first', 'prev'}
+#         '''
+#         super().__init__()
         
-        self.n_edge_attr=n_edge_attr
-        self.extra_efeat = extra_efeat
-        self.euclidian = euclidian
-        self.direction = direction
-        self.residual = residual
-        self.gnn = nn.ModuleList()
-        self.n_layers = len(feat_dims) - 1
+#         self.n_edge_attr=n_edge_attr
+#         self.extra_efeat = extra_efeat
+#         self.euclidian = euclidian
+#         self.direction = direction
+#         self.residual = residual
+#         self.gnn = nn.ModuleList()
+#         self.n_layers = len(feat_dims) - 1
         
-        for idx, (in_feat, out_feat) in enumerate(zip(feat_dims[:-1], feat_dims[1:])):
-            direction_dim = feat_dims[idx] if self.extra_efeat == 'prev' else feat_dims[0]
-            in_efeat_dim = self.n_edge_attr
-            if self.extra_efeat != 'first': 
-                in_efeat_dim += self.euclidian + self.direction * direction_dim
-            edge_net = nn.Sequential(*chain.from_iterable(
-                [nn.Linear(idim, odim),
-                 nn.BatchNorm1d(odim),
-                 act()]
-                for idim, odim, act in zip([in_efeat_dim] + efeat_hid_dims,
-                                           efeat_hid_dims + [in_feat * out_feat],
-                                           [efeat_hid_acts] * len(efeat_hid_dims) + [nn.Tanh])
-            )) if in_efeat_dim > 0 else None
-            self.gnn.append(GNNLayer(in_vfeat=in_feat, 
-                                     out_vfeat=out_feat, 
-                                     in_efeat=in_efeat_dim, 
-                                     edge_net=edge_net,
-                                     bn=bn, 
-                                     act=act, 
-                                     dp=dp))
+#         for idx, (in_feat, out_feat) in enumerate(zip(feat_dims[:-1], feat_dims[1:])):
+#             direction_dim = feat_dims[idx] if self.extra_efeat == 'prev' else feat_dims[0]
+#             in_efeat_dim = self.n_edge_attr
+#             if self.extra_efeat != 'first': 
+#                 in_efeat_dim += self.euclidian + self.direction * direction_dim
+#             edge_net = nn.Sequential(*chain.from_iterable(
+#                 [nn.Linear(idim, odim),
+#                  nn.BatchNorm1d(odim),
+#                  act()]
+#                 for idim, odim, act in zip([in_efeat_dim] + efeat_hid_dims,
+#                                            efeat_hid_dims + [in_feat * out_feat],
+#                                            [efeat_hid_acts] * len(efeat_hid_dims) + [nn.Tanh])
+#             )) if in_efeat_dim > 0 else None
+#             self.gnn.append(GNNLayer(in_vfeat=in_feat, 
+#                                      out_vfeat=out_feat, 
+#                                      in_efeat=in_efeat_dim, 
+#                                      edge_net=edge_net,
+#                                      bn=bn, 
+#                                      act=act, 
+#                                      dp=dp))
         
-    def _get_edge_feat(self, pos, data, euclidian=False, direction=False):
-        e = torch.zeros(len(data.model_edge_index), 0) if data.model_edge_attr is None else data.model_edge_attr
-        if euclidian or direction:
-            start_pos, end_pos = get_full_edges(pos, data)
-            u, d = l2_normalize(end_pos - start_pos, return_norm=True)
-            if euclidian:
-                e = torch.cat([e, u], dim=1)
-            if direction:
-                e = torch.cat([e, d], dim=1)
-        return e if e.numel() > 0 else None
+#     def _get_edge_feat(self, pos, data, euclidian=False, direction=False):
+#         e = torch.zeros(len(data.model_edge_index), 0) if data.model_edge_attr is None else data.model_edge_attr
+#         if euclidian or direction:
+#             start_pos, end_pos = get_full_edges(pos, data)
+#             u, d = l2_normalize(end_pos - start_pos, return_norm=True)
+#             if euclidian:
+#                 e = torch.cat([e, u], dim=1)
+#             if direction:
+#                 e = torch.cat([e, d], dim=1)
+#         return e if e.numel() > 0 else None
         
-    def forward(self, v, data):
-        vres = v
-        for layer in range(self.n_layers):
-            vsrc = v if self.euclidian == 'prev' else vres
-            get_extra = not (self.extra_efeat == 'first' and layer != 0)
+#     def forward(self, v, data):
+#         vres = v
+#         for layer in range(self.n_layers):
+#             vsrc = v if self.euclidian == 'prev' else vres
+#             get_extra = not (self.extra_efeat == 'first' and layer != 0)
             
-            e = self._get_edge_feat(vsrc, data, 
-                                    euclidian=self.euclidian and get_extra, 
-                                    direction=self.direction and get_extra)
-            v = self.gnn[layer](v, e, data)
-        return v + vres if self.residual else v
+#             e = self._get_edge_feat(vsrc, data, 
+#                                     euclidian=self.euclidian and get_extra, 
+#                                     direction=self.direction and get_extra)
+#             v = self.gnn[layer](v, e, data)
+#         return v + vres if self.residual else v
     
 
 class GNNGraphDrawing(nn.Module):
