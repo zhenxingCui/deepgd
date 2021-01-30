@@ -53,7 +53,7 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
 def generate_data_list(G, *, 
                        sparse=False, 
                        pivot_mode='random', 
-                       init_node='random',
+                       init_mode='random',
                        model_eidx='full_edge_index', 
                        model_eattr='full_edge_attr',
                        pmds_list=None,
@@ -153,8 +153,8 @@ def generate_data_list(G, *,
             return torch.tensor(pmds_list)
         
         methods = {
-            'random': generate_random_pivots,
-            'pmds': generate_mis_pivots,
+            'random': generate_random_node_attr,
+            'pmds': generate_pmds_node_attr,
         }
         
         return methods[mode](G)
@@ -163,7 +163,7 @@ def generate_data_list(G, *,
         return [generate_data_list(g,
                                    sparse=sparse,
                                    pivot_mode=pivot_mode,
-                                   init_node=init_node,
+                                   init_mode=init_mode,
                                    model_eidx=model_eidx,
                                    model_eattr=model_eattr,
                                    pmds_list=pmds_list[i],
@@ -173,7 +173,7 @@ def generate_data_list(G, *,
     apsp = generate_apsp(G)
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
-    x = generate_initial_node_attr(G, mode=init_node)
+    x = generate_initial_node_attr(G, mode=init_mode)
     data = Data(x=x.to(device), 
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
