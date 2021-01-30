@@ -41,7 +41,6 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
         file_list = all_files[data_slice]
     G_list = []
     for file in tqdm(file_list, desc=f"load G from {data_path}"):
-        print(file)
         G = nx.read_graphml(file)
         if nx.is_connected(G):
             mapping = {node: int(node[1:]) for node in G.nodes}
