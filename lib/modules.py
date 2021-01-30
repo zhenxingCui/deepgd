@@ -255,8 +255,8 @@ class Model(nn.Module):
             GNNBlock(feat_dims=[8, 2], act=False, static_efeats=2)
         ])
 
-    def forward(self, data, weights=None, output_hidden=False, numpy=False, with_initial_pos=False):
-        v = data.x if with_initial_pos else generate_rand_pos(len(data.x)).to(data.x.device)       
+    def forward(self, data, weights=None, output_hidden=False, numpy=False):
+        v = data.x if data.x is not None else generate_rand_pos(data.model_edge_index.max()).to(data.model_edge_attr.device)       
         v = rescale_with_minimized_stress(v, data)
           
         hidden = []
