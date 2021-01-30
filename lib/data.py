@@ -141,7 +141,7 @@ def generate_data_list(G, *, sparse=False, pivot_mode='random', device='cpu'):
         return torch.rand(G.number_of_nodes(), 2)
     
     if type(G) is list:
-        return [generate_data_list(g, sparse=sparse, k_fn=k_fn, pivot_mode=pivot_mode, device=device)
+        return [generate_data_list(g, sparse=sparse, pivot_mode=pivot_mode, device=device)
                 for g in tqdm(G, desc='preprocess G')]
     n = G.number_of_nodes()
     apsp = generate_apsp(G)
