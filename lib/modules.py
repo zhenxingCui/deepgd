@@ -256,7 +256,9 @@ class Model(nn.Module):
         ])
 
     def forward(self, data, weights=None, output_hidden=False, numpy=False):
-        v = data.x if data.x is not None else generate_rand_pos(data.model_edge_index.max()).to(data.model_edge_attr.device)       
+        n = data.full_edge_index.max()
+        device = data.full_edge_attr.device
+        v = data.x if data.x is not None else generate_rand_pos(n).to(device)       
         v = rescale_with_minimized_stress(v, data)
           
         hidden = []

@@ -111,6 +111,9 @@ def generate_data_list(G, *,
             elist.add((j, i))
         return sorted(list(elist))
     
+    def generate_grouped_edge_list(G, pivots):
+        pass
+    
     def generate_apsp(G):
         apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
         return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
