@@ -147,7 +147,7 @@ class GNNLayer(nn.Module):
         self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
         
     def forward(self, v, e, data):
-        v = self.conv(v, data.model_edge_index, e)
+        v = self.conv(v, data.edge_index, e)
         v = self.bn(v)
         v = self.act(v)
         v = self.dp(v)
@@ -202,9 +202,9 @@ class GNNBlock(nn.Module):
                                      dp=dp))
         
     def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
-        e = data.model_edge_attr[:, :self.static_efeats]
+        e = data.edge_attr[:, :self.static_efeats]
         if euclidian or direction:
-            start_pos, end_pos = get_model_edges(pos, data)
+            start_pos, end_pos = get_edges(pos, data)
             u, d = l2_normalize(end_pos - start_pos, return_norm=True)
             if euclidian:
                 e = torch.cat([e, u], dim=1)

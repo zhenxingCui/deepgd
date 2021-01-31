@@ -54,8 +54,8 @@ def generate_data_list(G, *,
                        sparse=False, 
                        pivot_mode='random', 
                        init_mode='random',
-                       model_eidx='full_edge_index', 
-                       model_eattr='full_edge_attr',
+                       edge_index='full_edge_index', 
+                       edge_attr='full_edge_attr',
                        pmds_list=None,
                        device='cpu'):
     def generate_pivots(G, apsp, k=None, mode='random'):
@@ -167,8 +167,8 @@ def generate_data_list(G, *,
                                    sparse=sparse,
                                    pivot_mode=pivot_mode,
                                    init_mode=init_mode,
-                                   model_eidx=model_eidx,
-                                   model_eattr=model_eattr,
+                                   edge_index=edge_index,
+                                   edge_attr=edge_attr,
                                    pmds_list=pmds_list[i],
                                    device=device)
                 for i, g in enumerate(tqdm(G, desc='preprocess G'))]
@@ -197,6 +197,6 @@ def generate_data_list(G, *,
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
         data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
         data.sparse_edge_attr_reg = torch.tensor(sparse_eattr_reg, dtype=torch.float, device=device)
-    data.model_edge_index = getattr(data, model_eidx)
-    data.model_edge_attr = getattr(data, model_eattr)
+    data.edge_index = getattr(data, edge_index)
+    data.edge_attr = getattr(data, edge_attr)
     return data
