@@ -153,7 +153,7 @@ def generate_data_list(G, *,
             return torch.rand(G.number_of_nodes(), 2)
         
         def generate_pmds_node_attr(G):
-            return torch.tensor(pmds_list)
+            return torch.tensor(pmds_list, dtype=torch.float)
         
         methods = {
             'random': generate_random_node_attr,
