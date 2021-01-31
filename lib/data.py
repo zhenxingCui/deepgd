@@ -92,6 +92,17 @@ def generate_data_list(G, *,
         
         return methods[mode](G, apsp, k)
     
+    def get_pivot_groups(G, apsp, pivots):
+        # TODO: break ties
+        groups = {p: [] for p in pivots}
+        for i in G.nodes:
+            pivot = pivots[np.argmin([apsp[i, p] for p in pivots])]
+            groups[pivot].append(i)
+        return groups
+    
+    def generate_real_edge_list(G):
+        pass
+    
     def generate_full_edge_list(G):
         n = G.number_of_nodes()
         return [(i, j)
@@ -111,8 +122,22 @@ def generate_data_list(G, *,
             elist.add((j, i))
         return sorted(list(elist))
     
-    def generate_grouped_edge_list(G, pivots):
-        pass
+    def generate_grouped_edge_list(G, pivots, groups):
+        elist = set()
+        for i in range(G.number_of_nodes()):
+            for j in pivots:
+                if i != j:
+                    elist.add((i, j))
+                    elist.add((j, i))
+        for i, j in list(G.edges):
+            elist.add((i, j))
+            elist.add((j, i))
+        for p in pivots:
+            for i in groups[p]:
+                for j in groups[p]:
+                    elist.add((i, j))
+                    elist.add((j, i))
+        return sorted(list(elist))
     
     def generate_apsp(G):
         apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
@@ -126,13 +151,8 @@ def generate_data_list(G, *,
             edge_attr.append((d, w))
         return edge_attr
     
-    def generate_pivot_edge_attr(G, sparse_elist, apsp, pivots):
-        # TODO: break ties
-        groups = {p: [] for p in pivots}
-        wdict = {i: {j: 1 for j in G.nodes} for i in G.nodes}
-        for i in G.nodes:
-            pivot = pivots[np.argmin([apsp[i, p] for p in pivots])]
-            groups[pivot].append(i)
+    def generate_pivot_edge_attr(G, sparse_elist, apsp, pivots, groups):
+        wdict = {i: {j: 1 / apsp[i, j]**2 for j in G.nodes} for i in G.nodes}
         for p in pivots:
             for i in G.nodes:
                 if p != i:
@@ -191,12 +211,17 @@ def generate_data_list(G, *,
         else:
             k = sparse(G)
         pivots = generate_pivots(G, apsp, int(k), mode=pivot_mode)
+        groups = get_pivot_groups(G, apsp, pivots)
         sparse_elist = generate_sparse_edge_list(G, pivots)
-        sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots)
+        grouped_elist = generate_grouped_edge_list(G, pivots, groups)
+        sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots, groups)
         sparse_eattr_reg = generate_regular_edge_attr(G, sparse_elist, apsp)
+        grouped_eattr = generate_pivot_edge_attr(G, grouped_elist, apsp, pivots, groups)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
+        data.grouped_edge_index = torch.tensor(grouped_elist, dtype=torch.long, device=device).t()
         data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
         data.sparse_edge_attr_reg = torch.tensor(sparse_eattr_reg, dtype=torch.float, device=device)
+        data.grouped_edge_attr = torch.tensor(grouped_eattr, dtype=torch.float, device=device)
     data.edge_index = getattr(data, edge_index)
     data.edge_attr = getattr(data, edge_attr)
     return data

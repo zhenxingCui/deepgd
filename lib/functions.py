@@ -29,6 +29,10 @@ def get_full_edge_index(batch):
 
 def get_sparse_edge_index(batch):
     return batch.sparse_edge_index.T
+
+
+def get_grouped_edge_index(batch):
+    return batch.grouped_edge_index.T
     
     
 def get_real_edge_index(batch):
@@ -48,6 +52,11 @@ def get_full_edges(node_pos, batch):
 
 def get_sparse_edges(node_pos, batch):
     edges = node_pos[get_sparse_edge_index(batch)]
+    return edges[:, 0, :], edges[:, 1, :]
+
+
+def get_grouped_edges(node_pos, batch):
+    edges = node_pos[get_grouped_edge_index(batch)]
     return edges[:, 0, :], edges[:, 1, :]
     
     
