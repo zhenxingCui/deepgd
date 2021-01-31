@@ -176,10 +176,11 @@ def generate_data_list(G, *,
     apsp = generate_apsp(G)
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
-    data = Data(full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
+    data = Data(x=torch.zeros(n, device=device),
+                full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     if init_mode is not None:
-        data.x = generate_initial_node_attr(G, mode=init_mode).to(device)
+        data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
     if sparse:
         if sparse == 'sqrt':
             k = np.round(np.sqrt(n))
