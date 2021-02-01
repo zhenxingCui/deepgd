@@ -152,7 +152,7 @@ def generate_data_list(G, *,
         return edge_attr
     
     def generate_pivot_edge_attr(G, sparse_elist, apsp, pivots, groups):
-        wdict = {i: {j: 1 / apsp[i, j]**2 for j in G.nodes} for i in G.nodes}
+        wdict = {i: {j: 0 if i == j else (1 / apsp[i, j]**2) for j in G.nodes} for i in G.nodes}
         for p in pivots:
             for i in G.nodes:
                 if p != i:
