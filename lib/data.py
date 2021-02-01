@@ -135,8 +135,9 @@ def generate_data_list(G, *,
         for p in pivots:
             for i in groups[p]:
                 for j in groups[p]:
-                    elist.add((i, j))
-                    elist.add((j, i))
+                    if i != j:
+                        elist.add((i, j))
+                        elist.add((j, i))
         return sorted(list(elist))
     
     def generate_apsp(G):
