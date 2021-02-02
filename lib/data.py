@@ -243,6 +243,7 @@ def generate_data_list(G, *,
         cluster_eattr_reg = generate_regular_edge_attr(G, cluster_elist, apsp)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
         data.grouped_edge_index = torch.tensor(grouped_elist, dtype=torch.long, device=device).t()
+        data.cluster_edge_index = torch.tensor(cluster_elist, dtype=torch.long, device=device).t()
         data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
         data.sparse_edge_attr_reg = torch.tensor(sparse_eattr_reg, dtype=torch.float, device=device)
         data.grouped_edge_attr = torch.tensor(grouped_eattr, dtype=torch.float, device=device)
