@@ -233,24 +233,31 @@ def generate_data_list(G, *,
             k = n
         pivots = generate_pivots(G, apsp, int(k), mode=pivot_mode)
         groups = get_pivot_groups(G, apsp, pivots)
+        
         sparse_elist = generate_sparse_edge_list(G, pivots)
-        grouped_elist = generate_grouped_edge_list(G, pivots, groups)
-        cluster_elist = generate_cluster_edge_list(G, pivots, groups)
         sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots, groups)
         sparse_eattr_reg = generate_regular_edge_attr(G, sparse_elist, apsp)
-        grouped_eattr = generate_pivot_edge_attr(G, grouped_elist, apsp, pivots, groups)
-        grouped_eattr_reg = generate_regular_edge_attr(G, grouped_elist, apsp)
-        cluster_eattr = generate_pivot_edge_attr(G, cluster_elist, apsp, pivots, groups)
-        cluster_eattr_reg = generate_regular_edge_attr(G, cluster_elist, apsp)
         data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
-        data.grouped_edge_index = torch.tensor(grouped_elist, dtype=torch.long, device=device).t()
-        data.cluster_edge_index = torch.tensor(cluster_elist, dtype=torch.long, device=device).t()
+        data.sparse_edge_sparsity = data.sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
         data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
         data.sparse_edge_attr_reg = torch.tensor(sparse_eattr_reg, dtype=torch.float, device=device)
+        
+        grouped_elist = generate_grouped_edge_list(G, pivots, groups)
+        grouped_eattr = generate_pivot_edge_attr(G, grouped_elist, apsp, pivots, groups)
+        grouped_eattr_reg = generate_regular_edge_attr(G, grouped_elist, apsp)
+        data.grouped_edge_index = torch.tensor(grouped_elist, dtype=torch.long, device=device).t()
+        data.grouped_edge_sparsity = data.grouped_edge_index.shape[1] / data.full_edge_index.shape[1]
         data.grouped_edge_attr = torch.tensor(grouped_eattr, dtype=torch.float, device=device)
         data.grouped_edge_attr_reg = torch.tensor(grouped_eattr_reg, dtype=torch.float, device=device)
+        
+        cluster_elist = generate_cluster_edge_list(G, pivots, groups)
+        cluster_eattr = generate_pivot_edge_attr(G, cluster_elist, apsp, pivots, groups)
+        cluster_eattr_reg = generate_regular_edge_attr(G, cluster_elist, apsp)
+        data.cluster_edge_index = torch.tensor(cluster_elist, dtype=torch.long, device=device).t()
+        data.cluster_edge_sparsity = data.cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
         data.cluster_edge_attr = torch.tensor(cluster_eattr, dtype=torch.float, device=device)
         data.cluster_edge_attr_reg = torch.tensor(cluster_eattr_reg, dtype=torch.float, device=device)
+        
     data.edge_index = getattr(data, edge_index)
     data.edge_attr = getattr(data, edge_attr)
     return data
