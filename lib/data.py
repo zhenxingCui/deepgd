@@ -289,19 +289,22 @@ def generate_data_list(G, *,
         return edge_attr
     
     def generate_regular_edge_attr_new(edge_index, apsp, device='cpu'):
-        d = apsp[edge_index[0], edge_index[1]]
+        index = edge_index.cpu()
+        d = apsp[index[0], index[1]]
         w = 1 / d ** 2
         return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
     
     def generate_pivot_edge_attr_new(edge_index, apsp, cardinalities, device='cpu'):
-        d = apsp[edge_index[0], edge_index[1]]
-        s = cardinalities[edge_index[0]]
+        index = edge_index.cpu()
+        d = apsp[index[0], index[1]]
+        s = cardinalities[index[0]]
         w = s / d ** 2
         return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
     
     def generate_symmetric_pivot_edge_attr(edge_index, apsp, cardinalities, device='cpu'):
-        d = apsp[edge_index[0], edge_index[1]]
-        s = cardinalities[edge_index[0]] * cardinalities[edge_index[1]]
+        index = edge_index.cpu()
+        d = apsp[index[0], index[1]]
+        s = cardinalities[index[0]] * cardinalities[index[1]]
         w = s / d ** 2
         return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
     
