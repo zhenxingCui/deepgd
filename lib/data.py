@@ -369,7 +369,8 @@ def generate_data_list(G, *,
             k = sparse(G)
         else:
             k = sparse
-        pivots = generate_pivots(G, apsp, int(k), mode=pivot_mode)
+        k = int(k)
+        pivots = generate_pivots(G, apsp, k, mode=pivot_mode)
         groups = get_pivot_groups(G, apsp, pivots)
         
         sparse_elist = generate_sparse_edge_list(G, pivots)
