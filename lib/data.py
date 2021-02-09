@@ -111,7 +111,8 @@ def generate_data_list(G, *,
         partial_apsp = apsp[pivots, :][:, nodes]
         groups = np.zeros_like(partial_apsp)
         groups[partial_apsp.argmin(axis=0), np.arange(groups.shape[1])] = 1
-        return {p: (n := np.array(nodes)[g.astype(bool)])[n != p] for p, g in zip(pivots, groups)}
+#         return {p: (n := np.array(nodes)[g.astype(bool)])[n != p] for p, g in zip(pivots, groups)}
+        return {p: np.array(nodes)[g.astype(bool)][np.array(nodes)[g.astype(bool)] != p] for p, g in zip(pivots, groups)}
     
     def get_recursive_pivot_groups(nodes, apsp, k):
         pivots = generate_maxmin_pivots_new(nodes, apsp, k)
