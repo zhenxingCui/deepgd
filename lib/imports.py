@@ -10,6 +10,7 @@ import pathlib
 import warnings
 from pprint import pformat
 from itertools import chain, combinations
+from functools import reduce
 
 import nvidia_smi
 from tqdm.notebook import tqdm

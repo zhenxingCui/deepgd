@@ -79,7 +79,7 @@ def generate_data_list(G, *,
 
         def generate_maxmin_pivots(G, apsp, k):
             nodes = list(G.nodes)
-            pivots = [random.choice(nodes)]
+            pivots = [nodes[apsp.max(axis=1).argmax()]]
             for _ in range(k - 1):
                 pivots.append(np.argmax([np.min(list(map(lambda p: apsp[i, p], pivots))) for i in nodes]))
             return pivots
@@ -92,6 +92,13 @@ def generate_data_list(G, *,
         
         return methods[mode](G, apsp, k)
     
+    def generate_maxmin_pivots_new(nodes, apsp, k):
+        partial_apsp = apsp[nodes, :][:, nodes]
+        pivots = [partial_apsp.max(axis=1).argmax()]
+        for _ in range(k - 1):
+            pivots.append(partial_apsp[:, pivots].min(axis=1).argmax())
+        return np.array(nodes)[pivots]
+        
     def get_pivot_groups(G, apsp, pivots):
         # TODO: break ties
         groups = {p: [] for p in pivots}
@@ -100,6 +107,98 @@ def generate_data_list(G, *,
             groups[pivot].append(i)
         return groups
     
+    def get_pivot_groups_new(nodes, apsp, pivots):
+        partial_apsp = apsp[pivots, :][:, nodes]
+        groups = np.zeros_like(partial_apsp)
+        groups[partial_apsp.argmin(axis=0), np.arange(groups.shape[1])] = 1
+        return {p: (n := np.array(nodes)[g.astype(bool)])[n != p] for p, g in zip(pivots, groups)}
+    
+    def get_recursive_pivot_groups(nodes, apsp, k):
+        pivots = generate_maxmin_pivots_new(nodes, apsp, k)
+        groups = get_pivot_groups_new(nodes, apsp, pivots)
+        for p in pivots:
+            if len(groups[p]) > k:
+                groups[p] = get_recursive_pivot_groups(groups[p], apsp, k)
+        return groups
+    
+    def get_pivot_group_cardinalities(groups):
+        cardin_dict = dict()
+        def get_cardinalities(groups):
+            if type(groups) is not dict:
+                cardin_dict.update(zip(groups, np.ones_like(groups)))
+                return len(groups) + 1
+            cardin = list(map(get_cardinalities, groups.values()))
+            cardin_dict.update(zip(groups, cardin))
+            return sum(cardin) + 1
+        get_cardinalities(groups)
+        return np.array(sorted(cardin_dict.items()))[:, 1]
+    
+    def get_peer_pivot_dense_edge_set(groups):
+        edges = set()
+        def add_all_edges(groups):
+            if type(groups) is dict:
+                edges.update([(p, q) for p in groups for q in groups if p != q])
+                for p in groups:
+                    add_all_edges(groups[p])
+        add_all_edges(groups)
+        return edges
+
+    def get_same_level_dense_edge_set(groups):
+        edges = set()
+        def add_all_edges(groups):
+            edges.update([(p, q) for p in groups for q in groups if p != q])
+            if type(groups) is dict:
+                for p in groups:
+                    add_all_edges(groups[p])
+        add_all_edges(groups)
+        return edges
+
+    def get_adjacent_level_dense_edge_set(groups):
+        edges = set()
+        def add_all_edges(groups):
+            if type(groups) is dict:
+                descendents = np.concatenate([add_all_edges(groups[p]) for p in groups])
+                edges.update([(p, i) for p in groups for i in descendents])
+                return np.array(list(groups))
+            else:
+                return groups
+        add_all_edges(groups)
+        return edges
+
+    def get_cross_level_dense_edge_set(groups):
+        edges = set()
+        def add_all_edges(groups):
+            if type(groups) is dict:
+                descendents = np.concatenate([add_all_edges(groups[p]) for p in groups])
+                edges.update([(p, i) for p in groups for i in descendents])
+                return np.concatenate((list(groups), descendents))
+            else:
+                return groups
+        add_all_edges(groups)
+        return edges
+
+    def get_tree_edge_set(groups):
+        edges = set()
+        def add_all_edges(groups):
+            if type(groups) is dict:
+                edges.update([(p, i) for p in groups for i in groups[p]])
+                for p in groups:
+                    add_all_edges(groups[p])
+        add_all_edges(groups)
+        return edges
+
+    def get_forward_edge_set(groups):
+        edges = set()
+        def add_all_edges(groups):
+            if type(groups) is dict:
+                descendents = {p: add_all_edges(groups[p]) for p in groups}
+                edges.update([(p, i) for p in groups for i in descendents[p]])
+                return np.concatenate((list(groups), *descendents.values()))
+            else:
+                return groups
+        add_all_edges(groups)
+        return edges
+
     def generate_real_edge_list(G):
         pass
     
@@ -158,6 +257,24 @@ def generate_data_list(G, *,
                         elist.add((j, i))
         return sorted(list(elist))
     
+    def get_hierarchical_cluster_edge_set(groups):
+        return get_tree_edge_set(groups).union(get_same_level_dense_edge_set(groups))
+
+    def get_recursive_cluster_edge_set(groups):
+        return get_forward_edge_set(groups).union(get_same_level_dense_edge_set(groups))
+
+    def get_hierarchical_sparse_edge_set(groups):
+        return get_adjacent_level_dense_edge_set(groups).union(get_peer_pivot_dense_edge_set(groups))
+
+    def get_recursive_sparse_edge_set(groups):
+        return get_cross_level_dense_edge_set(groups).union(get_peer_pivot_dense_edge_set(groups))
+    
+    def create_edge_index(*edge_sets, device='cpu'):
+        all_edges = reduce(lambda x, y: x.union(y), edge_sets, set())
+        reverse_edges = set(map(lambda x: x[::-1], all_edges))
+        sorted_symmetric_edges = sorted(list(all_edges.union(reverse_edges)))
+        return torch.tensor(sorted_symmetric_edges, dtype=torch.long, device=device).t()
+    
     def generate_apsp(G):
         apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
         return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
@@ -169,6 +286,23 @@ def generate_data_list(G, *,
             w = 1 / d**2
             edge_attr.append((d, w))
         return edge_attr
+    
+    def generate_regular_edge_attr_new(edge_index, apsp, device='cpu'):
+        d = apsp[edge_index[0], edge_index[1]]
+        w = 1 / d ** 2
+        return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
+    
+    def generate_pivot_edge_attr_new(edge_index, apsp, cardinalities, device='cpu'):
+        d = apsp[edge_index[0], edge_index[1]]
+        s = cardinalities[edge_index[0]]
+        w = s / d ** 2
+        return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
+    
+    def generate_symmetric_pivot_edge_attr(edge_index, apsp, cardinalities, device='cpu'):
+        d = apsp[edge_index[0], edge_index[1]]
+        s = cardinalities[edge_index[0]] * cardinalities[edge_index[1]]
+        w = s / d ** 2
+        return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
     
     def generate_pivot_edge_attr(G, sparse_elist, apsp, pivots, groups):
         wdict = {i: {j: 0 if i == j else (1 / apsp[i, j]**2) for j in G.nodes} for i in G.nodes}
@@ -230,7 +364,7 @@ def generate_data_list(G, *,
         elif callable(sparse):
             k = sparse(G)
         else:
-            k = n
+            k = sparse
         pivots = generate_pivots(G, apsp, int(k), mode=pivot_mode)
         groups = get_pivot_groups(G, apsp, pivots)
         
@@ -257,6 +391,37 @@ def generate_data_list(G, *,
         data.cluster_edge_sparsity = data.cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
         data.cluster_edge_attr = torch.tensor(cluster_eattr, dtype=torch.float, device=device)
         data.cluster_edge_attr_reg = torch.tensor(cluster_eattr_reg, dtype=torch.float, device=device)
+        
+        group_tree = get_recursive_pivot_groups(G.nodes, apsp, k)
+        cardinality_map = get_pivot_group_cardinalities(group_tree)
+        
+        hierarchical_cluster_eset = get_hierarchical_cluster_edge_set(group_tree)
+        data.hierarchical_cluster_edge_index = create_edge_index(G.edges, hierarchical_cluster_eset, device=device)
+        data.hierarchical_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, device=device)
+        data.hierarchical_cluster_edge_attr_pivot = generate_pivot_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
+        data.hierarchical_cluster_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
+        data.hierarchical_cluster_edge_sparsity = data.hierarchical_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
+        
+        recursive_cluster_eset = get_recursive_cluster_edge_set(group_tree)
+        data.recursive_cluster_edge_index = create_edge_index(G.edges, recursive_cluster_eset, device=device)
+        data.recursive_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.recursive_cluster_edge_index, apsp, device=device)
+        data.recursive_cluster_edge_attr_pivot = generate_pivot_edge_attr_new(data.recursive_cluster_edge_index, apsp, cardinality_map, device=device)
+        data.recursive_cluster_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.recursive_cluster_edge_index, apsp, cardinality_map, device=device)
+        data.recursive_cluster_edge_sparsity = data.recursive_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
+        
+        hierarchical_sparse_eset = get_hierarchical_sparse_edge_set(group_tree)
+        data.hierarchical_sparse_edge_index = create_edge_index(G.edges, hierarchical_sparse_eset, device=device)
+        data.hierarchical_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, device=device)
+        data.hierarchical_sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
+        data.hierarchical_sparse_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
+        data.hierarchical_sparse_edge_sparsity = data.hierarchical_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
+        
+        recursive_sparse_eset = get_recursive_sparse_edge_set(group_tree)
+        data.recursive_sparse_edge_index = create_edge_index(G.edges, recursive_sparse_eset, device=device)
+        data.recursive_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.recursive_sparse_edge_index, apsp, device=device)
+        data.recursive_sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
+        data.recursive_sparse_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
+        data.recursive_sparse_edge_sparsity = data.recursive_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
         
     data.edge_index = getattr(data, edge_index)
     data.edge_attr = getattr(data, edge_attr)

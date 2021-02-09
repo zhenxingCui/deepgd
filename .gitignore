@@ -9,3 +9,5 @@ data/
 checkpoints/
 ckpts/
 graphviz_baseline/
+.envrc
+.lab
