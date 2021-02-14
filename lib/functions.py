@@ -142,7 +142,7 @@ def get_radians(pos, batch,
     if return_num_real_edges:
         edge_counts = map_node_indices_to_graph_property(batch, angles[:,0], lambda g: len(get_real_edge_index(g)))
         result += (edge_counts,)
-    return result[0] if len(result) is 1 else result
+    return result[0] if len(result) == 1 else result
 
 
 def get_resolution_score(radians, node_degrees, node_indices):

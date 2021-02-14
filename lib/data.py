@@ -58,6 +58,11 @@ def generate_data_list(G, *,
                        edge_attr='full_edge_attr',
                        pmds_list=None,
                        device='cpu'):
+    
+    def generate_apsp(G):
+        apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
+        return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
+    
     def generate_pivots(G, apsp, k=None, mode='random'):
         def generate_random_pivots(G, apsp, k):
             return random.sample(list(G.nodes), k)
@@ -212,7 +217,7 @@ def generate_data_list(G, *,
     
     def generate_sparse_edge_list(G, pivots):
         elist = set()
-        for i in range(G.number_of_nodes()):
+        for i in G.nodes:
             for j in pivots:
                 if i != j:
                     elist.add((i, j))
@@ -258,6 +263,9 @@ def generate_data_list(G, *,
                         elist.add((j, i))
         return sorted(list(elist))
     
+    def get_sparse_edge_set(groups):
+        return get_cross_level_dense_edge_set(groups).union(get_peer_pivot_dense_edge_set(groups))
+    
     def get_hierarchical_cluster_edge_set(groups):
         return get_tree_edge_set(groups).union(get_same_level_dense_edge_set(groups))
 
@@ -272,13 +280,10 @@ def generate_data_list(G, *,
     
     def create_edge_index(*edge_sets, device='cpu'):
         all_edges = reduce(lambda x, y: x.union(y), edge_sets, set())
-        reverse_edges = set(map(lambda x: x[::-1], all_edges))
-        sorted_symmetric_edges = sorted(list(all_edges.union(reverse_edges)))
+        no_self_loop = {edge for edge in all_edges if edge[0] != edge[1]}
+        reverse_edges = set(map(lambda x: x[::-1], no_self_loop))
+        sorted_symmetric_edges = sorted(list(no_self_loop.union(reverse_edges)))
         return torch.tensor(sorted_symmetric_edges, dtype=torch.long, device=device).t()
-    
-    def generate_apsp(G):
-        apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
-        return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
     
     def generate_regular_edge_attr(G, elist, apsp):
         edge_attr = []
@@ -370,42 +375,16 @@ def generate_data_list(G, *,
         else:
             k = sparse
         k = int(k)
-        pivots = generate_pivots(G, apsp, k, mode=pivot_mode)
-        groups = get_pivot_groups(G, apsp, pivots)
-        
-        sparse_elist = generate_sparse_edge_list(G, pivots)
-        sparse_eattr = generate_pivot_edge_attr(G, sparse_elist, apsp, pivots, groups)
-        sparse_eattr_reg = generate_regular_edge_attr(G, sparse_elist, apsp)
-        data.sparse_edge_index = torch.tensor(sparse_elist, dtype=torch.long, device=device).t()
-        data.sparse_edge_sparsity = data.sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
-        data.sparse_edge_attr = torch.tensor(sparse_eattr, dtype=torch.float, device=device)
-        data.sparse_edge_attr_reg = torch.tensor(sparse_eattr_reg, dtype=torch.float, device=device)
-        
-        grouped_elist = generate_grouped_edge_list(G, pivots, groups)
-        grouped_eattr = generate_pivot_edge_attr(G, grouped_elist, apsp, pivots, groups)
-        grouped_eattr_reg = generate_regular_edge_attr(G, grouped_elist, apsp)
-        data.grouped_edge_index = torch.tensor(grouped_elist, dtype=torch.long, device=device).t()
-        data.grouped_edge_sparsity = data.grouped_edge_index.shape[1] / data.full_edge_index.shape[1]
-        data.grouped_edge_attr = torch.tensor(grouped_eattr, dtype=torch.float, device=device)
-        data.grouped_edge_attr_reg = torch.tensor(grouped_eattr_reg, dtype=torch.float, device=device)
-        
-        cluster_elist = generate_cluster_edge_list(G, pivots, groups)
-        cluster_eattr = generate_pivot_edge_attr(G, cluster_elist, apsp, pivots, groups)
-        cluster_eattr_reg = generate_regular_edge_attr(G, cluster_elist, apsp)
-        data.cluster_edge_index = torch.tensor(cluster_elist, dtype=torch.long, device=device).t()
-        data.cluster_edge_sparsity = data.cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
-        data.cluster_edge_attr = torch.tensor(cluster_eattr, dtype=torch.float, device=device)
-        data.cluster_edge_attr_reg = torch.tensor(cluster_eattr_reg, dtype=torch.float, device=device)
         
         group_tree = get_recursive_pivot_groups(G.nodes, apsp, k)
         cardinality_map = get_pivot_group_cardinalities(group_tree)
         
-        hierarchical_cluster_eset = get_hierarchical_cluster_edge_set(group_tree)
-        data.hierarchical_cluster_edge_index = create_edge_index(G.edges, hierarchical_cluster_eset, device=device)
-        data.hierarchical_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, device=device)
-        data.hierarchical_cluster_edge_attr_pivot = generate_pivot_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
-        data.hierarchical_cluster_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
-        data.hierarchical_cluster_edge_sparsity = data.hierarchical_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
+#         hierarchical_cluster_eset = get_hierarchical_cluster_edge_set(group_tree)
+#         data.hierarchical_cluster_edge_index = create_edge_index(G.edges, hierarchical_cluster_eset, device=device)
+#         data.hierarchical_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, device=device)
+#         data.hierarchical_cluster_edge_attr_pivot = generate_pivot_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
+#         data.hierarchical_cluster_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
+#         data.hierarchical_cluster_edge_sparsity = data.hierarchical_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
         
         recursive_cluster_eset = get_recursive_cluster_edge_set(group_tree)
         data.recursive_cluster_edge_index = create_edge_index(G.edges, recursive_cluster_eset, device=device)
@@ -414,19 +393,59 @@ def generate_data_list(G, *,
         data.recursive_cluster_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.recursive_cluster_edge_index, apsp, cardinality_map, device=device)
         data.recursive_cluster_edge_sparsity = data.recursive_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
         
-        hierarchical_sparse_eset = get_hierarchical_sparse_edge_set(group_tree)
-        data.hierarchical_sparse_edge_index = create_edge_index(G.edges, hierarchical_sparse_eset, device=device)
-        data.hierarchical_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, device=device)
-        data.hierarchical_sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
-        data.hierarchical_sparse_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
-        data.hierarchical_sparse_edge_sparsity = data.hierarchical_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
+#         hierarchical_sparse_eset = get_hierarchical_sparse_edge_set(group_tree)
+#         data.hierarchical_sparse_edge_index = create_edge_index(G.edges, hierarchical_sparse_eset, device=device)
+#         data.hierarchical_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, device=device)
+#         data.hierarchical_sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
+#         data.hierarchical_sparse_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
+#         data.hierarchical_sparse_edge_sparsity = data.hierarchical_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
         
-        recursive_sparse_eset = get_recursive_sparse_edge_set(group_tree)
-        data.recursive_sparse_edge_index = create_edge_index(G.edges, recursive_sparse_eset, device=device)
-        data.recursive_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.recursive_sparse_edge_index, apsp, device=device)
-        data.recursive_sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
-        data.recursive_sparse_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
-        data.recursive_sparse_edge_sparsity = data.recursive_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
+#         recursive_sparse_eset = get_recursive_sparse_edge_set(group_tree)
+#         data.recursive_sparse_edge_index = create_edge_index(G.edges, recursive_sparse_eset, device=device)
+#         data.recursive_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.recursive_sparse_edge_index, apsp, device=device)
+#         data.recursive_sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
+#         data.recursive_sparse_edge_attr_sympivot = generate_symmetric_pivot_edge_attr(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
+#         data.recursive_sparse_edge_sparsity = data.recursive_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
+        
+        rc_x = create_edge_index(recursive_cluster_eset).shape[1]
+        rc_n = G.number_of_nodes()
+        rc_k = int(np.round((2 * rc_n - 1 - np.sqrt((2 * rc_n - 1) ** 2 - 4 * rc_x)) / 2))
+        rc_k_pivots = generate_maxmin_pivots_new(G.nodes, apsp, rc_k)
+        rc_k_groups = get_pivot_groups_new(G, apsp, rc_k_pivots)
+        cardinality_map_rc_k = get_pivot_group_cardinalities(rc_k_groups)
+        
+        sparse_eset_rc_k = get_sparse_edge_set(rc_k_groups)
+        data.sparse_edge_index_rc_k = create_edge_index(G.edges, sparse_eset_rc_k, device=device)
+        data.sparse_edge_attr_reg_rc_k = generate_regular_edge_attr_new(data.sparse_edge_index_rc_k, apsp, device=device)
+        data.sparse_edge_attr_pivot_rc_k = generate_pivot_edge_attr_new(data.sparse_edge_index_rc_k, apsp, cardinality_map_rc_k, device=device)
+        data.sparse_edge_sparsity_rc_k = data.sparse_edge_index_rc_k.shape[1] / data.full_edge_index.shape[1]
+        
+#         pivots = generate_maxmin_pivots_new(G.nodes, apsp, k)
+#         groups = get_pivot_groups_new(G, apsp, pivots)
+#         cardinality_map = get_pivot_group_cardinalities(groups)
+        
+#         sparse_eset = get_sparse_edge_set(groups)
+#         data.sparse_edge_index = create_edge_index(G.edges, sparse_eset, device=device)
+#         data.sparse_edge_attr_reg = generate_regular_edge_attr_new(data.sparse_edge_index, apsp, device=device)
+#         data.sparse_edge_attr_pivot = generate_pivot_edge_attr_new(data.sparse_edge_index, apsp, cardinality_map, device=device)
+#         data.sparse_edge_sparsity = data.sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
+        
+        
+#         grouped_elist = generate_grouped_edge_list(G, pivots, groups)
+#         grouped_eattr = generate_pivot_edge_attr(G, grouped_elist, apsp, pivots, groups)
+#         grouped_eattr_reg = generate_regular_edge_attr(G, grouped_elist, apsp)
+#         data.grouped_edge_index = torch.tensor(grouped_elist, dtype=torch.long, device=device).t()
+#         data.grouped_edge_sparsity = data.grouped_edge_index.shape[1] / data.full_edge_index.shape[1]
+#         data.grouped_edge_attr = torch.tensor(grouped_eattr, dtype=torch.float, device=device)
+#         data.grouped_edge_attr_reg = torch.tensor(grouped_eattr_reg, dtype=torch.float, device=device)
+        
+#         cluster_elist = generate_cluster_edge_list(G, pivots, groups)
+#         cluster_eattr = generate_pivot_edge_attr(G, cluster_elist, apsp, pivots, groups)
+#         cluster_eattr_reg = generate_regular_edge_attr(G, cluster_elist, apsp)
+#         data.cluster_edge_index = torch.tensor(cluster_elist, dtype=torch.long, device=device).t()
+#         data.cluster_edge_sparsity = data.cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
+#         data.cluster_edge_attr = torch.tensor(cluster_eattr, dtype=torch.float, device=device)
+#         data.cluster_edge_attr_reg = torch.tensor(cluster_eattr_reg, dtype=torch.float, device=device)
         
     data.edge_index = getattr(data, edge_index)
     data.edge_attr = getattr(data, edge_attr)
