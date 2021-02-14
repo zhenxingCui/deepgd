@@ -302,11 +302,11 @@ def generate_data_list(G, *,
         w = 1 / d ** 2
         return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
 
-    def generate_pivot_src_neighborhood_edge_attr(edge_index, apsp, cardinalities, neighborhood, device='cpu'):
+    def generate_pivot_src_neighborhood_edge_attr(edge_index, apsp, neighborhood, cardinalities, device='cpu'):
         index = edge_index.cpu()
-        d = apsp[edge_index[0], edge_index[1]]
-        c = cardinalities[edge_index[0]]
-        n = neighborhood[edge_index[0], d//2]
+        d = apsp[index[0], index[1]]
+        c = cardinalities[index[0]]
+        n = neighborhood[index[0], d//2]
         s = np.minimum(c, n)
         w = s / d ** 2
         return torch.tensor(np.stack([d, w], axis=1), dtype=torch.float, device=device)
@@ -390,7 +390,7 @@ def generate_data_list(G, *,
         k = int(k)
         
         group_tree = get_recursive_pivot_groups(G.nodes, apsp, k)
-        cardinality_map = get_pivot_group_cardinalities(group_tree)
+        cardinalities = get_pivot_group_cardinalities(group_tree)
 #         hierarchical_cluster_eset = get_hierarchical_cluster_edge_set(group_tree)
 #         data.hierarchical_cluster_edge_index = create_edge_index(G.edges, hierarchical_cluster_eset, device=device)
 #         data.hierarchical_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, device=device)
@@ -401,17 +401,17 @@ def generate_data_list(G, *,
         recursive_cluster_eset = get_recursive_cluster_edge_set(group_tree)
         data.recursive_cluster_edge_index = create_edge_index(G.edges, recursive_cluster_eset, device=device)
         data.recursive_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.recursive_cluster_edge_index, apsp, device=device)
-        data.recursive_cluster_edge_attr_nbhd = generate_pivot_src_neighborhood_edge_attr(data.recursive_cluster_edge_index, apsp, neighborhood, device=device)
-        data.recursive_cluster_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.recursive_cluster_edge_index, apsp, cardinality_map, device=device)
-        data.recursive_cluster_edge_attr_sympivot = generate_pivot_srcdst_group_edge_attr(data.recursive_cluster_edge_index, apsp, cardinality_map, device=device)
+        data.recursive_cluster_edge_attr_nbhd = generate_pivot_src_neighborhood_edge_attr(data.recursive_cluster_edge_index, apsp, neighborhood, cardinalities, device=device)
+        data.recursive_cluster_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.recursive_cluster_edge_index, apsp, cardinalities, device=device)
+        data.recursive_cluster_edge_attr_sympivot = generate_pivot_srcdst_group_edge_attr(data.recursive_cluster_edge_index, apsp, cardinalities, device=device)
         data.recursive_cluster_edge_sparsity = data.recursive_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
         
         hierarchical_sparse_eset = get_hierarchical_sparse_edge_set(group_tree)
         data.hierarchical_sparse_edge_index = create_edge_index(G.edges, hierarchical_sparse_eset, device=device)
         data.hierarchical_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_sparse_edge_index, apsp, device=device)
-        data.hierarchical_sparse_edge_attr_nbhd = generate_pivot_src_neighborhood_edge_attr(data.hierarchical_sparse_edge_index, apsp, neighborhood, device=device)
-        data.hierarchical_sparse_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
-        data.hierarchical_sparse_edge_attr_sympivot = generate_pivot_srcdst_group_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinality_map, device=device)
+        data.hierarchical_sparse_edge_attr_nbhd = generate_pivot_src_neighborhood_edge_attr(data.hierarchical_sparse_edge_index, apsp, neighborhood, cardinalities, device=device)
+        data.hierarchical_sparse_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinalities, device=device)
+        data.hierarchical_sparse_edge_attr_sympivot = generate_pivot_srcdst_group_edge_attr(data.hierarchical_sparse_edge_index, apsp, cardinalities, device=device)
         data.hierarchical_sparse_edge_sparsity = data.hierarchical_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
         
 #         recursive_sparse_eset = get_recursive_sparse_edge_set(group_tree)
@@ -426,13 +426,13 @@ def generate_data_list(G, *,
         rc_k = int(np.round((2 * rc_n - 1 - np.sqrt((2 * rc_n - 1) ** 2 - 4 * rc_x)) / 2))
         rc_k_pivots = generate_maxmin_pivots_new(G.nodes, apsp, rc_k)
         rc_k_groups = get_pivot_groups_new(G, apsp, rc_k_pivots)
-        cardinality_map_rc_k = get_pivot_group_cardinalities(rc_k_groups)
+        cardinalities_rc_k = get_pivot_group_cardinalities(rc_k_groups)
         
         sparse_eset_rc_k = get_sparse_edge_set(rc_k_groups)
         data.sparse_edge_index_rc_k = create_edge_index(G.edges, sparse_eset_rc_k, device=device)
         data.sparse_edge_attr_reg_rc_k = generate_regular_edge_attr_new(data.sparse_edge_index_rc_k, apsp, device=device)
-        data.sparse_edge_attr_nbhd_rc_k = generate_pivot_src_neighborhood_edge_attr(data.sparse_edge_index_rc_k, apsp, neighborhood, device=device)
-        data.sparse_edge_attr_pivot_rc_k = generate_pivot_src_group_edge_attr(data.sparse_edge_index_rc_k, apsp, cardinality_map_rc_k, device=device)
+        data.sparse_edge_attr_nbhd_rc_k = generate_pivot_src_neighborhood_edge_attr(data.sparse_edge_index_rc_k, apsp, neighborhood, cardinalities_rc_k, device=device)
+        data.sparse_edge_attr_pivot_rc_k = generate_pivot_src_group_edge_attr(data.sparse_edge_index_rc_k, apsp, cardinalities_rc_k, device=device)
         data.sparse_edge_sparsity_rc_k = data.sparse_edge_index_rc_k.shape[1] / data.full_edge_index.shape[1]
         
         hs_x = create_edge_index(hierarchical_sparse_eset).shape[1]
@@ -440,13 +440,13 @@ def generate_data_list(G, *,
         hs_k = int(np.round((2 * hs_n - 1 - np.sqrt((2 * hs_n - 1) ** 2 - 4 * hs_x)) / 2))
         hs_k_pivots = generate_maxmin_pivots_new(G.nodes, apsp, hs_k)
         hs_k_groups = get_pivot_groups_new(G, apsp, hs_k_pivots)
-        cardinality_map_hs_k = get_pivot_group_cardinalities(hs_k_groups)
+        cardinality_hs_k = get_pivot_group_cardinalities(hs_k_groups)
         
         sparse_eset_hs_k = get_sparse_edge_set(hs_k_groups)
         data.sparse_edge_index_hs_k = create_edge_index(G.edges, sparse_eset_hs_k, device=device)
         data.sparse_edge_attr_reg_hs_k = generate_regular_edge_attr_new(data.sparse_edge_index_hs_k, apsp, device=device)
-        data.sparse_edge_attr_nbhd_hs_k = generate_pivot_src_neighborhood_edge_attr(data.sparse_edge_index_hs_k, apsp, neighborhood, device=device)
-        data.sparse_edge_attr_pivot_hs_k = generate_pivot_src_group_edge_attr(data.sparse_edge_index_hs_k, apsp, cardinality_map_hs_k, device=device)
+        data.sparse_edge_attr_nbhd_hs_k = generate_pivot_src_neighborhood_edge_attr(data.sparse_edge_index_hs_k, apsp, neighborhood, cardinality_hs_k, device=device)
+        data.sparse_edge_attr_pivot_hs_k = generate_pivot_src_group_edge_attr(data.sparse_edge_index_hs_k, apsp, cardinality_hs_k, device=device)
         data.sparse_edge_sparsity_hs_k = data.sparse_edge_index_hs_k.shape[1] / data.full_edge_index.shape[1]
         
 #         pivots = generate_maxmin_pivots_new(G.nodes, apsp, k)
