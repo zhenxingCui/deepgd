@@ -488,4 +488,7 @@ class LazyDeviceMappingDataLoader:
     def __iter__(self):
         for batch in self.loader:
             yield batch.to(self.device)
+            
+    def __len__(self):
+        return len(self.loader)
         
