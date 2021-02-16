@@ -111,6 +111,7 @@ def train(model, criterion, optimizer, data_loader, callback=None):
     model.train()
     loss_all, components_all = [], []
     for batch in data_loader:
+        torch.cuda.empty_cache()
         optimizer.zero_grad()
         output, loss, components = predict(model, batch, criterion)
         loss.backward()
@@ -127,6 +128,7 @@ def train_with_dynamic_weights(model, controller, criterion, optimizer, data_loa
     model.train()
     loss_all, components_all = [], []
     for batch in data_loader:
+        torch.cuda.empty_cache()
         gamma = F.normalize(torch.rand(controller.n_criteria), p=1, dim=0)
         controller.set_gamma(gamma.tolist())
         controller.step()
@@ -147,6 +149,7 @@ def validate(model, criterion, data_loader, callback=None):
         model.eval()
         loss_all, components_all = [], []
         for batch in data_loader:
+            torch.cuda.empty_cache()
             output, loss, components = predict(model, batch, criterion)
             loss_all.append(loss.item())
             components_all.append([comp.item() for comp in components])
@@ -161,6 +164,7 @@ def validate_with_dynamic_weights(model, controller, criterion, data_loader, cal
         model.eval()
         loss_all, components_all = [], []
         for batch in data_loader:
+            torch.cuda.empty_cache()
             gamma = F.normalize(torch.rand(controller.n_criteria), p=1, dim=0)
             controller.set_gamma(gamma.tolist())
             controller.step()
