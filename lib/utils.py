@@ -104,21 +104,37 @@ def generate_polygon(n, radius=1):
 def find_intersect(segments, accurate=True):
     intersect(segments)
     
+
+def cuda_memsafe_iter(loader, callback):
+    results = []
+    batch_iter = iter(data_loader)
+    batch = None
+    while True:
+        try:
+            batch = next(batch_iter)
+            torch.cuda.empty_cache()
+            results.appand(callback(batch=batch))
+        except StopIteration:
+            break
+        except RuntimeError:
+            del batch
+            torch.cuda.empty_cache()
+    return results
+
     
 def train(model, criterion, optimizer, data_loader, callback=None):
     if callback is None:
         callback = lambda *_, **__: None
     model.train()
-    loss_all, components_all = [], []
-    for batch in data_loader:
-        torch.cuda.empty_cache()
+    def train_one_batch(batch):
         optimizer.zero_grad()
         output, loss, components = predict(model, batch, criterion)
         loss.backward()
         optimizer.step()
-        loss_all.append(loss.item())
-        components_all.append([comp.item() for comp in components])
         callback(output=output, loss=loss, components=components)
+        return loss.item(), [comp.item() for comp in components]
+    results = cuda_memsafe_iter(data_loader, train_one_batch)
+    loss_all, components_all = zip(*results)
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
@@ -147,13 +163,12 @@ def validate(model, criterion, data_loader, callback=None):
         callback = lambda *_, **__: None
     with torch.no_grad():
         model.eval()
-        loss_all, components_all = [], []
-        for batch in data_loader:
-            torch.cuda.empty_cache()
+        def val_one_batch(batch):
             output, loss, components = predict(model, batch, criterion)
-            loss_all.append(loss.item())
-            components_all.append([comp.item() for comp in components])
             callback(output=output, loss=loss, components=components)
+            return loss.item(), [comp.item() for comp in components]
+        results = cuda_memsafe_iter(data_loader, val_one_batch)
+        loss_all, components_all = zip(*results)
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
