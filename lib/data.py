@@ -397,8 +397,8 @@ def generate_data_list(G, *,
         data.hierarchical_cluster_edge_index = create_edge_index(G.edges, hierarchical_cluster_eset, device=device)
         data.hierarchical_cluster_edge_attr_reg = generate_regular_edge_attr_new(data.hierarchical_cluster_edge_index, apsp, device=device)
         data.hierarchical_cluster_edge_attr_nbhd = generate_pivot_src_neighborhood_edge_attr(data.hierarchical_cluster_edge_index, apsp, neighborhood, cardinalities, device=device)
-        data.hierarchical_cluster_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
-        data.hierarchical_cluster_edge_attr_sym = generate_pivot_srcdst_group_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinality_map, device=device)
+        data.hierarchical_cluster_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinalities, device=device)
+        data.hierarchical_cluster_edge_attr_sym = generate_pivot_srcdst_group_edge_attr(data.hierarchical_cluster_edge_index, apsp, cardinalities, device=device)
         data.hierarchical_cluster_edge_sparsity = data.hierarchical_cluster_edge_index.shape[1] / data.full_edge_index.shape[1]
         
         recursive_cluster_eset = get_recursive_cluster_edge_set(group_tree)
@@ -421,8 +421,8 @@ def generate_data_list(G, *,
         data.recursive_sparse_edge_index = create_edge_index(G.edges, recursive_sparse_eset, device=device)
         data.recursive_sparse_edge_attr_reg = generate_regular_edge_attr_new(data.recursive_sparse_edge_index, apsp, device=device)
         data.recursive_sparse_edge_attr_nbhd = generate_pivot_src_neighborhood_edge_attr(data.recursive_sparse_edge_index, apsp, neighborhood, cardinalities, device=device)
-        data.recursive_sparse_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
-        data.recursive_sparse_edge_attr_sym = generate_pivot_srcdst_group_edge_attr(data.recursive_sparse_edge_index, apsp, cardinality_map, device=device)
+        data.recursive_sparse_edge_attr_pivot = generate_pivot_src_group_edge_attr(data.recursive_sparse_edge_index, apsp, cardinalities, device=device)
+        data.recursive_sparse_edge_attr_sym = generate_pivot_srcdst_group_edge_attr(data.recursive_sparse_edge_index, apsp, cardinalities, device=device)
         data.recursive_sparse_edge_sparsity = data.recursive_sparse_edge_index.shape[1] / data.full_edge_index.shape[1]
         
 #         rc_x = create_edge_index(recursive_cluster_eset).shape[1]
