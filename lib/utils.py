@@ -114,7 +114,7 @@ def cuda_memsafe_iter(loader, callback):
         try:
             batch = next(batch_iter)
             torch.cuda.empty_cache()
-            results.appand(callback(batch=batch))
+            results.append(callback(batch=batch))
         except StopIteration:
             break
         except RuntimeError:
