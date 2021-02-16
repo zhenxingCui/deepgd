@@ -107,8 +107,9 @@ def find_intersect(segments, accurate=True):
 
 def cuda_memsafe_iter(loader, callback):
     results = []
-    batch_iter = iter(data_loader)
+    batch_iter = iter(loader)
     batch = None
+    failed_count = 0
     while True:
         try:
             batch = next(batch_iter)
@@ -117,8 +118,11 @@ def cuda_memsafe_iter(loader, callback):
         except StopIteration:
             break
         except RuntimeError:
+            failed_count += 1
+            print('CUDA memory overflow! Skip batch...')
             del batch
             torch.cuda.empty_cache()
+    print(f'Iteration finished. {failed_count} out of {len(loader)} failed!')
     return results
 
     
