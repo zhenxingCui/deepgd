@@ -186,7 +186,8 @@ def get_adj(batch, reverse=False, value=1):
 
 # Hack: will fail for non-complete graphs
 def get_complete_adj(batch):
-    return get_adj(batch) + np.eye(batch.num_nodes)
+    device = batch.x.device
+    return get_adj(batch) + torch.eye(batch.num_nodes).to(device)
 
 def get_shorted_path_adj(batch):
     adj =  get_adj(batch, reverse=True, value=np.inf)

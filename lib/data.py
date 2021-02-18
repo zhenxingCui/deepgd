@@ -422,6 +422,7 @@ def generate_data_list(G, *,
         rc_k_pivots = generate_maxmin_pivots(G.nodes, apsp, rc_k)
         rc_k_groups = get_pivot_groups(G, apsp, rc_k_pivots)
         cardinalities_rc_k = get_pivot_group_cardinalities(rc_k_groups)
+        data.pivots_rc = rc_k
         
         sparse_eset_rc_k = get_recursive_sparse_edge_set(rc_k_groups)
         data.sparse_edge_index_rc_k = create_edge_index(G.edges, sparse_eset_rc_k, device=device)
@@ -436,6 +437,7 @@ def generate_data_list(G, *,
         hs_k_pivots = generate_maxmin_pivots(G.nodes, apsp, hs_k)
         hs_k_groups = get_pivot_groups(G, apsp, hs_k_pivots)
         cardinalities_hs_k = get_pivot_group_cardinalities(hs_k_groups)
+        data.pivots_hs = hs_k
         
         sparse_eset_hs_k = get_recursive_sparse_edge_set(hs_k_groups)
         data.sparse_edge_index_hs_k = create_edge_index(G.edges, sparse_eset_hs_k, device=device)
