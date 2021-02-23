@@ -198,23 +198,32 @@ def test(model, criteria_list, dataset, idx_range, callback=None, **model_params
     if callback is None:
         callback = lambda *_, **__: None
     stress = []
-    raw_stress_ratio = []
-    scaled_stress_ratio = []
-    scaled_stress_spc = []
+    stress_spc = []
+    l1_angle = []
+    l1_angle_spc = []
+    edge = []
+    edge_spc = []
+    ring = []
+    ring_spc = []
+    tsne = []
     resolution_score = []
     min_angle = []
     losses = []
     for idx in tqdm(idx_range):
         gt_stress = load_ground_truth_stress(idx)
-        pred, metrics = get_performance_metrics(model, dataset[idx],
-                                                gt_stress=gt_stress, 
+        pred, metrics = get_performance_metrics(model, dataset[idx], idx,
                                                 criteria_list=criteria_list,
                                                 **model_params)
 
-        stress.append(metrics['scaled_stress'])
-        raw_stress_ratio.append(metrics['raw_stress_ratio'])
-        scaled_stress_ratio.append(metrics['scaled_stress_ratio'])
-        scaled_stress_spc.append(metrics['scaled_stress_spc'])
+        stress.append(metrics['stress'])
+        stress_spc.append(metrics['stress_spc'])
+        l1_angle.append(metrics['l1_angle'])
+        l1_angle_spc.append(metrics['l1_angle_spc'])
+        edge.append(metrics['edge'])
+        edge_spc.append(metrics['edge_spc'])
+        ring.append(metrics['ring'])
+        ring_spc.append(metrics['ring_spc'])
+        tsne.append(metrics['tsne'])
         resolution_score.append(metrics['resolution_score'])
         min_angle.append(metrics['min_angle'])
         losses.append(metrics['losses'])
@@ -223,9 +232,14 @@ def test(model, criteria_list, dataset, idx_range, callback=None, **model_params
     
     return {
         "stress": torch.tensor(stress),
-        "raw_stress_ratio": torch.tensor(raw_stress_ratio),
-        "scaled_stress_ratio": torch.tensor(scaled_stress_ratio),
-        "scaled_stress_spc": torch.tensor(scaled_stress_spc),
+        "stress_spc": torch.tensor(stress_spc),
+        "l1_angle": torch.tensor(l1_angle),
+        "l1_angle_spc": torch.tensor(l1_angle_spc),
+        "edge": torch.tensor(edge),
+        "edge_spc": torch.tensor(edge_spc),
+        "ring": torch.tensor(ring),
+        "ring_spc": torch.tensor(ring_spc),
+        "tsne": torch.tensor(tsne),
         "resolution_score": torch.tensor(resolution_score),
         "min_angle": torch.tensor(min_angle),
         "losses": torch.tensor(losses),
@@ -249,6 +263,16 @@ def predict(model, batch, criterion, **model_params):
     return output, loss, components
     
     
+@lru_cache(maxsize=1)
+def load_gt_dataframe(file="gt.csv"):
+    return pd.read_csv(file)
+    
+    
+def load_ground_truth(idx, metric, file="gt.csv"):
+    gt = load_gt_dataframe(file)
+    return gt[gt['index'] == idx][metric].to_numpy()[0]
+    
+
 def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     gt_losses = pd.read_csv(file).to_numpy()
     if (gt_losses[:, 0] == index).any():
@@ -256,42 +280,58 @@ def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     return None
     
     
-def get_performance_metrics(model, data, gt_stress=None, criteria_list=None, **model_params):
+def get_performance_metrics(model, data, idx, criteria_list=None, **model_params):
     with torch.no_grad():
         model.eval()
         data = preprocess_batch(model, data)
-        stress_criterion = StressLoss()
+        stress_criterion = NormalizedStressLoss()
+        l1_angle_criterion = L1AngularLoss()
+        edge_criterion = FixedMeanEdgeLengthVarianceLoss()
+        ring_criterion = ExponentialRingLoss()
+        tsne_criterion = TSNELoss()
         
-        if gt_stress is None:
-            gt = get_ground_truth(data)
-            gt_stress = stress_criterion(gt, data)
+#         if gt_stress is None:
+#             gt = get_ground_truth(data)
+#             gt_stress = stress_criterion(gt, data)
         
+        gt_stress = load_ground_truth(idx, 'stress')
+        gt_l1_angle = load_ground_truth(idx, 'l1_angle')
+        gt_edge = load_ground_truth(idx, 'edge')
+        gt_ring = load_ground_truth(idx, 'ring')
+    
         raw_pred = model(data, **model_params)
-        raw_stress = stress_criterion(raw_pred, data)
+        pred = rescale_with_minimized_stress(raw_pred, data)
         
-        scaled_pred = rescale_with_minimized_stress(raw_pred, data)
-        scaled_stress = stress_criterion(scaled_pred, data)
+        stress = stress_criterion(pred, data)
+        l1_angle = l1_angle_criterion(pred, data)
+        edge = edge_criterion(pred, data)
+        ring = ring_criterion(pred, data)
         
-        if criteria_list is not None:
-            other_criteria = CompositeLoss(criteria_list)
-            _, losses = other_criteria(scaled_pred, data, return_components=True)
-
-        raw_stress_ratio = (raw_stress - gt_stress) / gt_stress
-        scaled_stress_ratio = (scaled_stress - gt_stress) / gt_stress
-        scaled_stress_spc = (scaled_stress - gt_stress) / np.maximum(gt_stress, scaled_stress.cpu().numpy())
-
-        theta, degree, node = get_radians(scaled_pred, data, 
+        stress_spc = (stress - gt_stress) / np.maximum(gt_stress, stress.cpu().numpy())
+        l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(gt_l1_angle, l1_angle.cpu().numpy())
+        edge_spc = (edge - gt_edge) / np.maximum(gt_edge, edge.cpu().numpy())
+        ring_spc = (ring - gt_ring) / np.maximum(gt_ring, ring.cpu().numpy())
+    
+        tsne = tsne_criterion(pred, data)
+        theta, degree, node = get_radians(pred, data, 
                                           return_node_degrees=True,
                                           return_node_indices=True)
         resolution_score = get_resolution_score(theta, degree, node)
         min_angle = get_min_angle(theta)
-    
-    return scaled_pred.cpu().numpy(), {
-        'raw_stress': raw_stress.item(),
-        'scaled_stress': scaled_stress.item(),
-        'raw_stress_ratio': raw_stress_ratio.item(), 
-        'scaled_stress_ratio': scaled_stress_ratio.item(),
-        'scaled_stress_spc': scaled_stress_spc.item(),
+        if criteria_list is not None:
+            other_criteria = CompositeLoss(criteria_list)
+            _, losses = other_criteria(pred, data, return_components=True)
+
+    return pred.cpu().numpy(), {
+        'stress': stress.item(),
+        'stress_spc': stress_spc.item(),
+        'l1_angle': l1_angle.item(),
+        'l1_angle_spc': l1_angle_spc.item(),
+        'edge': edge.item(),
+        'edge_spc': edge_spc.item(),
+        'ring': ring.item(),
+        'ring_spc': ring_spc.item(),
+        'tsne': tsne.item(),
         'resolution_score': resolution_score.item(),
         'min_angle': min_angle.item(),
         'losses': list(map(torch.Tensor.item, losses))

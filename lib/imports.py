@@ -10,10 +10,11 @@ import pathlib
 import warnings
 from pprint import pformat
 from itertools import chain, combinations
-from functools import reduce
+from functools import reduce, lru_cache
 
 import nvidia_smi
-from tqdm.notebook import tqdm
+# from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
