@@ -206,6 +206,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
     ring = []
     ring_spc = []
     tsne = []
+    tsne_spc[]
     resolution_score = []
     min_angle = []
     losses = []
@@ -226,6 +227,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
         ring.append(metrics['ring'])
         ring_spc.append(metrics['ring_spc'])
         tsne.append(metrics['tsne'])
+        tsne_spc.append(metrics['tsne_spc'])
         resolution_score.append(metrics['resolution_score'])
         min_angle.append(metrics['min_angle'])
         losses.append(metrics['losses'])
@@ -242,6 +244,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
         "ring": torch.tensor(ring),
         "ring_spc": torch.tensor(ring_spc),
         "tsne": torch.tensor(tsne),
+        "tsne_spc": torch.tensor(tsne_spc),
         "resolution_score": torch.tensor(resolution_score),
         "min_angle": torch.tensor(min_angle),
         "losses": torch.tensor(losses),
@@ -300,6 +303,7 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
         gt_l1_angle = load_ground_truth(idx, 'l1_angle', gt_file)
         gt_edge = load_ground_truth(idx, 'edge', gt_file)
         gt_ring = load_ground_truth(idx, 'ring', gt_file)
+        gt_tsne = load_ground_truth(idx, 'tsne', gt_file)
     
         if eval_method is None:
             raw_pred = model(data, **model_params)
@@ -317,13 +321,14 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
         l1_angle = l1_angle_criterion(pred, data)
         edge = edge_criterion(pred, data)
         ring = ring_criterion(pred, data)
+        tsne = tsne_criterion(pred, data)
         
         stress_spc = (stress - gt_stress) / np.maximum(gt_stress, stress.cpu().numpy())
         l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(gt_l1_angle, l1_angle.cpu().numpy())
         edge_spc = (edge - gt_edge) / np.maximum(gt_edge, edge.cpu().numpy())
         ring_spc = (ring - gt_ring) / np.maximum(gt_ring, ring.cpu().numpy())
+        tsne_spc = (tsne - gt_tsne) / np.maximum(gt_tsne, tsne.cpu().numpy())
     
-        tsne = tsne_criterion(pred, data)
         theta, degree, node = get_radians(pred, data, 
                                           return_node_degrees=True,
                                           return_node_indices=True)
@@ -343,6 +348,7 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
         'ring': ring.item(),
         'ring_spc': ring_spc.item(),
         'tsne': tsne.item(),
+        'tsne_spc': tsne_spc.item(),
         'resolution_score': resolution_score.item(),
         'min_angle': min_angle.item(),
         'losses': list(map(torch.Tensor.item, losses))
