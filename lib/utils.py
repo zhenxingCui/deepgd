@@ -281,7 +281,7 @@ def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     return None
     
     
-def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, **model_params):
+def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, gt_file='gt.csv', **model_params):
     with torch.no_grad():
         model.eval()
         data = preprocess_batch(model, data)
@@ -295,10 +295,10 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
 #             gt = get_ground_truth(data)
 #             gt_stress = stress_criterion(gt, data)
         
-        gt_stress = load_ground_truth(idx, 'stress')
-        gt_l1_angle = load_ground_truth(idx, 'l1_angle')
-        gt_edge = load_ground_truth(idx, 'edge')
-        gt_ring = load_ground_truth(idx, 'ring')
+        gt_stress = load_ground_truth(idx, 'stress', gt_file)
+        gt_l1_angle = load_ground_truth(idx, 'l1_angle', gt_file)
+        gt_edge = load_ground_truth(idx, 'edge', gt_file)
+        gt_ring = load_ground_truth(idx, 'ring', gt_file)
     
         if eval_method is None:
             raw_pred = model(data, **model_params)
