@@ -206,7 +206,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
     ring = []
     ring_spc = []
     tsne = []
-    tsne_spc[]
+    tsne_spc = []
     resolution_score = []
     min_angle = []
     losses = []
