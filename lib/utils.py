@@ -214,7 +214,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
         pred, metrics = get_performance_metrics(model, dataset[idx], idx,
                                                 criteria_list=criteria_list,
                                                 eval_method=eval_method,
-                                                gt_file=gt_file
+                                                gt_file=gt_file,
                                                 **model_params)
 
         stress.append(metrics['stress'])
