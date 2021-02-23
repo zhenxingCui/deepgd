@@ -194,7 +194,7 @@ def validate_with_dynamic_weights(model, controller, criterion, data_loader, cal
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def test(model, criteria_list, dataset, idx_range, callback=None, **model_params):
+def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, **model_params):
     if callback is None:
         callback = lambda *_, **__: None
     stress = []
@@ -213,6 +213,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, **model_params
         gt_stress = load_ground_truth_stress(idx)
         pred, metrics = get_performance_metrics(model, dataset[idx], idx,
                                                 criteria_list=criteria_list,
+                                                eval_method=eval_method,
                                                 **model_params)
 
         stress.append(metrics['stress'])
@@ -280,7 +281,7 @@ def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     return None
     
     
-def get_performance_metrics(model, data, idx, criteria_list=None, **model_params):
+def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, **model_params):
     with torch.no_grad():
         model.eval()
         data = preprocess_batch(model, data)
@@ -299,8 +300,17 @@ def get_performance_metrics(model, data, idx, criteria_list=None, **model_params
         gt_edge = load_ground_truth(idx, 'edge')
         gt_ring = load_ground_truth(idx, 'ring')
     
-        raw_pred = model(data, **model_params)
-        pred = rescale_with_minimized_stress(raw_pred, data)
+        if eval_method is None:
+            raw_pred = model(data, **model_params)
+            pred = rescale_with_minimized_stress(raw_pred, data)
+        elif eval_method == "tsne":
+            hidden = model(data, output_hidden=True, numpy=True, **model_params)
+            raw_pred = torch.tensor(tsne_project(hidden[-2]))
+            pred = rescale_with_minimized_stress(raw_pred, data)
+        elif eval_method == "umap":
+            hidden = model(data, output_hidden=True, numpy=True, **model_params)
+            raw_pred = torch.tensor(umap_project(hidden[-2]))
+            pred = rescale_with_minimized_stress(raw_pred, data)
         
         stress = stress_criterion(pred, data)
         l1_angle = l1_angle_criterion(pred, data)
