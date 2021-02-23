@@ -194,7 +194,7 @@ def validate_with_dynamic_weights(model, controller, criterion, data_loader, cal
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, **model_params):
+def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, gt_file='gt.csv', **model_params):
     if callback is None:
         callback = lambda *_, **__: None
     stress = []
@@ -214,6 +214,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
         pred, metrics = get_performance_metrics(model, dataset[idx], idx,
                                                 criteria_list=criteria_list,
                                                 eval_method=eval_method,
+                                                gt_file=gt_file
                                                 **model_params)
 
         stress.append(metrics['stress'])
