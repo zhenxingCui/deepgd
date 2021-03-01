@@ -1,4 +1,5 @@
 import os
+import os.path
 import re
 import time
 import glob
@@ -13,8 +14,7 @@ from itertools import chain, combinations
 from functools import reduce, lru_cache
 
 import nvidia_smi
-# from tqdm.notebook import tqdm
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 import numpy as np
 import pandas as pd
