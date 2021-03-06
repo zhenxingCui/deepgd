@@ -370,7 +370,7 @@ def generate_data_list(G, *,
                 raw_edge_index=create_edge_index(G.edges),
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device),
-                gt_pos = generate_initial_node_attr(G, mode='init_mode').to(device))
+                gt_pos = generate_initial_node_attr(G, mode='gviz').to(device))
     if init_mode is not None:
         data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
     if sparse:
