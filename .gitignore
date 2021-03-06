@@ -1,7 +1,6 @@
 .ipynb_checkpoints/
 __pycache__/
 *.log
-*.pickle
 *.zip
 tensorboards/
 visualizations/
