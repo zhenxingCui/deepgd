@@ -338,9 +338,14 @@ def generate_data_list(G, *,
         def generate_pmds_node_attr(G):
             return torch.tensor(pmds_list, dtype=torch.float)
         
+        def generate_gviz_node_attr(G):
+            layout = nx.nx_agraph.graphviz_layout(G, prog='neato')
+            return torch.tensor(list(layout.values()), dtype=torch.float)
+        
         methods = {
             'random': generate_random_node_attr,
             'pmds': generate_pmds_node_attr,
+            'gviz': generate_gviz_node_attr,
         }
         
         return methods[mode](G)
@@ -362,8 +367,10 @@ def generate_data_list(G, *,
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
     data = Data(x=torch.zeros(n, device=device), n=n, m=m,
+                raw_edge_index=create_edge_index(G.edges),
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
-                full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
+                full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device),
+                gt_pos = generate_initial_node_attr(G, mode='init_mode').to(device))
     if init_mode is not None:
         data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
     if sparse:
@@ -477,6 +484,11 @@ def generate_data_list(G, *,
     data.edge_index = data[edge_index]
     data.edge_attr = data[edge_attr]
     return data
+
+
+def prepare_discriminator_data(data, pos=None):
+    data.edge_index = data.raw_edge_index
+    data.pos = pos or data.gt_pos
 
 
 class LazyDeviceMappingDataLoader:
