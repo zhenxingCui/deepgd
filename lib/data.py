@@ -489,7 +489,7 @@ def generate_data_list(G, *,
 
 def prepare_discriminator_data(data, pos=None):
     data.edge_index = data.raw_edge_index
-    data.pos = data.gt_pos is pos is None else pos
+    data.pos = data.gt_pos if pos is None else pos
 
 
 class LazyDeviceMappingDataLoader:
