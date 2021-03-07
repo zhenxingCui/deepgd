@@ -57,6 +57,7 @@ def generate_data_list(G, *,
                        edge_index='full_edge_index', 
                        edge_attr='full_edge_attr',
                        pmds_list=None,
+                       gviz_list=None,
                        device='cpu'):
     
     def generate_apsp(G):
@@ -339,8 +340,7 @@ def generate_data_list(G, *,
             return torch.tensor(pmds_list, dtype=torch.float)
         
         def generate_gviz_node_attr(G):
-            layout = nx.nx_agraph.graphviz_layout(G, prog='neato')
-            return torch.tensor(list(layout.values()), dtype=torch.float)
+            return torch.tensor(gviz_list, dtype=torch.float)
         
         methods = {
             'random': generate_random_node_attr,
@@ -358,6 +358,7 @@ def generate_data_list(G, *,
                                    edge_index=edge_index,
                                    edge_attr=edge_attr,
                                    pmds_list=pmds_list[i],
+                                   gviz_list=gviz_list[i],
                                    device=device)
                 for i, g in enumerate(tqdm(G, desc='preprocess G'))]
     n = G.number_of_nodes()
@@ -368,9 +369,9 @@ def generate_data_list(G, *,
     full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
     data = Data(x=torch.zeros(n, device=device), n=n, m=m,
                 raw_edge_index=create_edge_index(G.edges),
+                gt_pos = generate_initial_node_attr(G, mode='gviz').to(device),
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
-                full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device),
-                gt_pos = generate_initial_node_attr(G, mode='gviz').to(device))
+                full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     if init_mode is not None:
         data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
     if sparse:
