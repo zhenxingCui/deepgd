@@ -4,6 +4,7 @@ import re
 import time
 import glob
 import json
+import copy
 import shutil
 import pickle
 import random 
