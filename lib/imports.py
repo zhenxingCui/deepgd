@@ -25,7 +25,6 @@ from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
-from bentley_ottmann.planar import segments_intersections as intersect
 
 import torch
 import torch.nn as nn
