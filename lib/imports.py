@@ -36,4 +36,3 @@ import torch_geometric.utils
 import torch_geometric.nn as gnn
 from torch_geometric.data import Data, DataLoader, Dataset
 from torch_geometric.data.batch import Batch
-import pytorch_lightning as pl
