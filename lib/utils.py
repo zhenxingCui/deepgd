@@ -122,7 +122,7 @@ def cuda_memsafe_iter(loader, callback):
             print('CUDA memory overflow! Skip batch...')
             del batch
             torch.cuda.empty_cache()
-    print(f'Iteration finished. {failed_count} out of {len(loader)} failed!')
+#     print(f'Iteration finished. {failed_count} out of {len(loader)} failed!')
     return results
 
     
