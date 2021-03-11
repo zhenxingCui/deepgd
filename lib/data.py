@@ -1,19 +1,5 @@
 from .imports import *
-
-
-def cache(fn):
-    def cache_hit(*arg, **kwargs):
-        return pickle.load(open(kwargs['cache'], 'rb'))
-    def cache_miss(*arg, **kwargs):
-        cache = kwargs.pop('cache')
-        result = fn(*arg, **kwargs)
-        pickle.dump(result, open(cache, 'wb'))
-        return result
-    def wrapped(*arg, **kwargs):
-        return (fn(*arg, **kwargs) if 'cache' not in kwargs 
-                else cache_hit(*arg, **kwargs) if os.path.isfile(kwargs['cache']) 
-                else cache_miss(*arg, **kwargs))
-    return wrapped
+from .tools import *
 
 
 def generate_random_index(data_path='data/rome', 
@@ -26,7 +12,7 @@ def generate_random_index(data_path='data/rome',
             print(f, file=fout) 
             
             
-@cache
+@cache()
 def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
     if index_file is not None:
         all_files = [f'{data_path}/{f}' for f in open(index_file).read().splitlines() if f.rstrip()]
@@ -49,7 +35,7 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
     return G_list[0] if type(data_slice) is int else G_list
 
 
-@cache
+@cache()
 def generate_data_list(G, *, 
                        sparse=False, 
                        pivot_mode='random', 
