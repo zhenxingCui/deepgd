@@ -382,3 +382,106 @@ class GNNGraphDrawing(nn.Module):
             vout = v.detach().cpu().numpy() if numpy else v
 
         return hidden if output_hidden else vout
+    
+    
+class GCNLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, bn=False, act=False, dp=None, aggr='mean'):
+        super().__init__()
+        self.conv = gnn.GCNConv(in_channels, out_channels, aggr=aggr)
+        self.bn = gnn.BatchNorm(out_channels) if bn else nn.Identity()
+        self.act = nn.LeakyReLU() if act else nn.Identity()
+        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
+        
+    def forward(self, x, data):
+        x = self.conv(x, data.edge_index)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.dp(x)
+        return x
+        
+        
+class DenseLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, bn=False, act=False, dp=None):
+        super().__init__()
+        self.dense = nn.Linear(in_channels, out_channels)
+        self.bn = nn.BatchNorm1d(out_channels) if bn else nn.Identity()
+        if type(act) is bool:
+            self.act = nn.LeakyReLU() if act else nn.Identity()
+        else:
+            self.act = act
+        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
+        
+    def forward(self, x):
+        x = self.dense(x)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.dp(x)
+        return x
+        
+        
+class Discriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = GCNLayer(in_channels=2, out_channels=8, bn=False, act=True, dp=None)
+        self.conv2 = GCNLayer(in_channels=8, out_channels=16, bn=False, act=True, dp=0.1)
+        self.conv3 = GCNLayer(in_channels=16, out_channels=32, bn=False, act=True, dp=0.1)
+        self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
+        self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
+        self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
+        self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
+        self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
+        
+    def forward(self, batch):
+        x = self.conv1(batch.pos, batch)
+        x = self.conv2(x, batch)
+        x = self.conv3(x, batch)
+        x = self.conv4(x, batch)
+        x = self.conv5(x, batch)
+        feats = gnn.global_mean_pool(x, batch.batch)
+        x = self.dense1(feats)
+        x = self.dense2(x)
+        x = self.dense3(x)
+        return x.flatten()
+    
+    
+class Generator(nn.Module):
+    def __init__(self, num_blocks=9, n_weights=0):
+        super().__init__()
+
+        self.in_blocks = nn.ModuleList([
+            GNNBlock(feat_dims=[2, 8, 8], bn=True, dp=0.2, static_efeats=2)
+        ])
+        self.hid_blocks = nn.ModuleList([
+            GNNBlock(feat_dims=[8, 8, 8, 8], 
+                     efeat_hid_dims=[16],
+                     bn=True, 
+                     act=True,
+                     dp=0.2, 
+                     static_efeats=2,
+                     dynamic_efeats='skip', 
+                     euclidian=True, 
+                     direction=True, 
+                     n_weights=n_weights,
+                     residual=True)
+            for _ in range(num_blocks)
+        ])
+        self.out_blocks = nn.ModuleList([
+            GNNBlock(feat_dims=[8, 8], bn=True, static_efeats=2),
+            GNNBlock(feat_dims=[8, 2], act=False, static_efeats=2)
+        ])
+
+    def forward(self, data, weights=None, output_hidden=False, numpy=False):
+        v = data.pos if data.pos is not None else generate_rand_pos(len(data.x)).to(data.x.device)       
+        v = rescale_with_minimized_stress(v, data)
+        
+        hidden = []
+        for block in chain(self.in_blocks, 
+                           self.hid_blocks, 
+                           self.out_blocks):
+            v = block(v, data, weights)
+            if output_hidden:
+                hidden.append(v.detach().cpu().numpy() if numpy else v)
+        if not output_hidden:
+            vout = v.detach().cpu().numpy() if numpy else v
+        
+        return hidden if output_hidden else vout
