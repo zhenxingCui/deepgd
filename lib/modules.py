@@ -420,27 +420,48 @@ class DenseLayer(nn.Module):
         
         
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, n_conv=5, n_dense=3):
         super().__init__()
+        self.n_conv = n_conv;
+        self.n_dense = n_dense;
         self.conv1 = GCNLayer(in_channels=2, out_channels=8, bn=False, act=True, dp=None)
         self.conv2 = GCNLayer(in_channels=8, out_channels=16, bn=False, act=True, dp=0.1)
         self.conv3 = GCNLayer(in_channels=16, out_channels=32, bn=False, act=True, dp=0.1)
-        self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
-        self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
-        self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
-        self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
-        self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
+        if n_conv == 4:
+            self.conv4 = GCNLayer(in_channels=32, out_channels=128, bn=False, act=False, dp=None)
+        elif n_conv == 5:
+            self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
+            self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
+        elif n_conv == 6:
+            self.conv4 = GCNLayer(in_channels=32, out_channels=32, bn=False, act=True, dp=0.1)
+            self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
+            self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
+        if n_dense == 3:
+            self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
+            self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
+            self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
+        elif n_dense == 4:
+            self.dense1 = DenseLayer(in_channels=128, out_channels=64, bn=False, act=True, dp=0.3)
+            self.dense2 = DenseLayer(in_channels=64, out_channels=32, bn=False, act=True, dp=0.3)
+            self.dense3 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
+            self.dense4 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
         
     def forward(self, batch):
         x = self.conv1(batch.pos, batch)
         x = self.conv2(x, batch)
         x = self.conv3(x, batch)
         x = self.conv4(x, batch)
-        x = self.conv5(x, batch)
+        if self.n_conv >= 5:
+            x = self.conv5(x, batch)
+        if self.n_conv >= 6:
+            x = self.conv6(x, batch)
         feats = gnn.global_mean_pool(x, batch.batch)
         x = self.dense1(feats)
         x = self.dense2(x)
         x = self.dense3(x)
+        if self.n_dense >= 4:
+            x = self.dense4(x)
+        
         return x.flatten()
     
     
