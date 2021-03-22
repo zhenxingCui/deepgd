@@ -420,27 +420,27 @@ class DenseLayer(nn.Module):
         
         
 class Discriminator(nn.Module):
-    def __init__(self, n_conv=5, n_dense=3):
+    def __init__(self, conv=5, dense=3):
         super().__init__()
-        self.n_conv = n_conv;
-        self.n_dense = n_dense;
+        self.n_conv = conv;
+        self.n_dense = dense;
         self.conv1 = GCNLayer(in_channels=2, out_channels=8, bn=False, act=True, dp=None)
         self.conv2 = GCNLayer(in_channels=8, out_channels=16, bn=False, act=True, dp=0.1)
         self.conv3 = GCNLayer(in_channels=16, out_channels=32, bn=False, act=True, dp=0.1)
-        if n_conv == 4:
+        if self.n_conv == 4:
             self.conv4 = GCNLayer(in_channels=32, out_channels=128, bn=False, act=False, dp=None)
-        elif n_conv == 5:
+        elif self.n_conv == 5:
             self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
             self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
-        elif n_conv == 6:
+        elif self.n_conv == 6:
             self.conv4 = GCNLayer(in_channels=32, out_channels=32, bn=False, act=True, dp=0.1)
             self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
             self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
-        if n_dense == 3:
+        if self.n_dense == 3:
             self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
             self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
             self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
-        elif n_dense == 4:
+        elif self.n_dense == 4:
             self.dense1 = DenseLayer(in_channels=128, out_channels=64, bn=False, act=True, dp=0.3)
             self.dense2 = DenseLayer(in_channels=64, out_channels=32, bn=False, act=True, dp=0.3)
             self.dense3 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
