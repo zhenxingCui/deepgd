@@ -434,8 +434,8 @@ class Discriminator(nn.Module):
             self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
         elif self.n_conv == 6:
             self.conv4 = GCNLayer(in_channels=32, out_channels=32, bn=False, act=True, dp=0.1)
-            self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
-            self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
+            self.conv5 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
+            self.conv6 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
         if self.n_dense == 3:
             self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
             self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
