@@ -420,7 +420,7 @@ class DenseLayer(nn.Module):
         
         
 class Discriminator(nn.Module):
-    def __init__(self, conv=5, dense=3):
+    def __init__(self, conv=5, dense=3, softplus=True):
         super().__init__()
         self.n_conv = conv;
         self.n_dense = dense;
@@ -439,12 +439,12 @@ class Discriminator(nn.Module):
         if self.n_dense == 3:
             self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
             self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
-            self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
+            self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
         elif self.n_dense == 4:
             self.dense1 = DenseLayer(in_channels=128, out_channels=64, bn=False, act=True, dp=0.3)
             self.dense2 = DenseLayer(in_channels=64, out_channels=32, bn=False, act=True, dp=0.3)
             self.dense3 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
-            self.dense4 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus(), dp=None)
+            self.dense4 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
         
     def forward(self, batch):
         x = self.conv1(batch.pos, batch)
@@ -479,9 +479,9 @@ class Generator(nn.Module):
                      act=True,
                      dp=0.2, 
                      static_efeats=2,
-                     dynamic_efeats='skip', 
-                     euclidian=True, 
-                     direction=True, 
+                     dynamic_efeats='skip',
+                     euclidian=True,
+                     direction=True,
                      n_weights=n_weights,
                      residual=True)
             for _ in range(num_blocks)
