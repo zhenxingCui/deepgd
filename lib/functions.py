@@ -181,7 +181,7 @@ def get_ground_truth(data, G, prog='neato', scaled=True):
 def get_adj(batch, reverse=False, value=1):
     device = batch.x.device
     adj = torch.zeros(batch.num_nodes, batch.num_nodes).to(device)
-    adj[tuple(batch.edge_index)] = 1
+    adj[tuple(batch.full_edge_index)] = 1
     return (1 - adj if reverse else adj) * value
 
 # Hack: will fail for non-complete graphs
