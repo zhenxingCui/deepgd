@@ -506,3 +506,4 @@ class Generator(nn.Module):
             vout = v.detach().cpu().numpy() if numpy else v
         
         return hidden if output_hidden else vout
+    

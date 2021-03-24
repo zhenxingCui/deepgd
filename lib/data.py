@@ -473,10 +473,13 @@ def generate_data_list(G, *,
     return data
 
 
-def prepare_discriminator_data(data, pos=None):
+def prepare_discriminator_data(data, pos=None, interpolate=0):
     dis_data = copy.copy(data)
     dis_data.edge_index = dis_data.raw_edge_index
-    dis_data.pos = dis_data.gt_pos if pos is None else pos
+    if pos is None:
+        dis_data.pos = dis_data.gt_pos
+    else:
+        dis_data.pos = interpolate * dis_data.gt_pos + (1 - interpolate) * pos
     return dis_data
 
 
