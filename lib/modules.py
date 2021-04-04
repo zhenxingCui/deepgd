@@ -418,6 +418,23 @@ class DenseLayer(nn.Module):
         x = self.dp(x)
         return x
         
+
+class EdgeFeatureDiscriminator(nn.Module):
+    def __init__(self, softplus=True):
+        super().__init__()
+        self.conv = GNNBlock(feat_dims=[2, 8, 8, 16, 16, 32], bn=True, dp=0.2, static_efeats=2)
+        self.dense1 = DenseLayer(in_channels=32, out_channels=16, bn=False, act=True, dp=0.3)
+        self.dense2 = DenseLayer(in_channels=16, out_channels=8, bn=False, act=True, dp=0.3)
+        self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
+        
+    def forward(self, batch):
+        x = self.conv1(batch.pos, batch)
+        feats = gnn.global_mean_pool(x, batch.batch)
+        x = self.dense1(feats)
+        x = self.dense2(x)
+        x = self.dense3(x)
+        return x.flatten()
+        
         
 class Discriminator(nn.Module):
     def __init__(self, conv=5, dense=3, softplus=True):

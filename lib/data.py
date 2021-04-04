@@ -473,9 +473,13 @@ def generate_data_list(G, *,
     return data
 
 
-def prepare_discriminator_data(data, pos=None, interpolate=0):
+def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=False):
     dis_data = copy.copy(data)
-    dis_data.edge_index = dis_data.raw_edge_index
+    if complete_graph:
+        dis_data.edge_index = dis_data.full_edge_index
+        dis_data.edge_attr = dis_data.full_edge_attr
+    else:
+        dis_data.edge_index = dis_data.raw_edge_index
     if pos is None:
         dis_data.pos = dis_data.gt_pos
     else:
