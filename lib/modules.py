@@ -428,7 +428,7 @@ class EdgeFeatureDiscriminator(nn.Module):
         self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
         
     def forward(self, batch):
-        x = self.conv1(batch.pos, batch)
+        x = self.conv(batch.pos, batch)
         feats = gnn.global_mean_pool(x, batch.batch)
         x = self.dense1(feats)
         x = self.dense2(x)
