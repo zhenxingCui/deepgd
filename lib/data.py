@@ -499,9 +499,9 @@ def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=Fal
     else:
         dis_data.edge_index = dis_data.raw_edge_index
     if pos is None:
-        dis_data.pos = rescale_with_minimized_stress(dis_data.gt_pos)
+        dis_data.pos = rescale_with_minimized_stress(dis_data.gt_pos, dis_data)
     else:
-        dis_data.pos = interpolate * rescale_with_minimized_stress(dis_data.gt_pos) + (1 - interpolate) * rescale_with_minimized_stress(pos)
+        dis_data.pos = interpolate * rescale_with_minimized_stress(dis_data.gt_pos, dis_data) + (1 - interpolate) * rescale_with_minimized_stress(pos, dis_data)
     return dis_data
 
 
