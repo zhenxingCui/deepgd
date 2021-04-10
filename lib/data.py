@@ -1,6 +1,7 @@
 from .imports import *
 from .tools import *
 from .layouts import *
+from .functions import *
 
 
 def generate_random_index(data_path='data/rome', 
