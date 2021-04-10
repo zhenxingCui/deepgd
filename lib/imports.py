@@ -25,6 +25,7 @@ from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
+import forceatlas2 as fa2
 
 import torch
 import torch.nn as nn

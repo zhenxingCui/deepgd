@@ -1,5 +1,6 @@
 from .imports import *
 from .tools import *
+from .layouts import *
 
 
 def generate_random_index(data_path='data/rome', 
@@ -44,6 +45,7 @@ def generate_data_list(G, *,
                        edge_attr='full_edge_attr',
                        pmds_list=None,
                        gviz_list=None,
+                       noisy_layout=False,
                        device='cpu'):
     
     def generate_apsp(G):
@@ -336,6 +338,11 @@ def generate_data_list(G, *,
         
         return methods[mode](G)
     
+    def generate_noisy_pos(G, fn, proper):
+        r = random.random()
+        layout = fn(G, r=r, proper=proper)
+        return layout_to_pos(layout), r
+    
     if type(G) is list:
         return [generate_data_list(g,
                                    sparse=sparse,
@@ -345,6 +352,7 @@ def generate_data_list(G, *,
                                    edge_attr=edge_attr,
                                    pmds_list=pmds_list[i],
                                    gviz_list=gviz_list[i],
+                                   noisy_layout=noisy_layout,
                                    device=device)
                 for i, g in enumerate(tqdm(G, desc='preprocess G'))]
     n = G.number_of_nodes()
@@ -360,6 +368,15 @@ def generate_data_list(G, *,
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     if init_mode is not None:
         data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
+    if noisy_layout:
+        proper = get_proper_layout(G)
+        data.random_normal, data.random_normal_r = generate_noisy_pos(G, get_random_normal_layout, proper)
+        data.random_uniform, data.random_uniform_r = generate_noisy_pos(G, get_random_uniform_layout, proper)
+        data.phantom, data.phantom_r = generate_noisy_pos(G, get_phantom_layout, proper)
+        data.perturb, data.perturb_r = generate_noisy_pos(G, get_perturb_layout, proper)
+        data.flip_nodes, data.flip_nodes_r = generate_noisy_pos(G, get_flip_nodes_layout, proper)
+        data.flip_edges, data.flip_edges_r = generate_noisy_pos(G, get_flip_edges_layout, proper)
+        data.movlsq, data.movlsq_r = generate_noisy_pos(G, get_movlsq_layout, proper)
     if sparse:
         if sparse == 'sqrt':
             k = np.round(np.sqrt(n))
