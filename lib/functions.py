@@ -58,6 +58,11 @@ def get_full_edges(node_pos, batch):
     return edges[:, 0, :], edges[:, 1, :]
 
 
+def get_raw_edges(node_pos, batch)
+    edges = node_pos[get_raw_edge_index(batch)]
+    return edges[:, 0, :], edges[:, 1, :]
+
+
 def get_sparse_edges(node_pos, batch):
     edges = node_pos[get_sparse_edge_index(batch)]
     return edges[:, 0, :], edges[:, 1, :]
