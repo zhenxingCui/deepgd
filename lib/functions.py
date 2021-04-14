@@ -27,6 +27,10 @@ def get_full_edge_index(batch):
     return batch.full_edge_index.T
 
 
+def get_raw_edge_index(batch):
+    return batch.raw_edge_index.T
+
+
 def get_sparse_edge_index(batch):
     return batch.sparse_edge_index.T
 
