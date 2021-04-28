@@ -168,7 +168,12 @@ class GNNBlock(nn.Module):
                  n_weights=0,
                  residual=False):
         '''
-        dynamic_efeats: {'skip', 'first', 'prev'}
+        dynamic_efeats: {
+            skip: block input to each layer, 
+            first: block input to first layer, 
+            prev: previous layer output to next layer, 
+            orig: original node feature to each layer
+        }
         '''
         super().__init__()
         self.static_efeats = static_efeats
@@ -181,7 +186,9 @@ class GNNBlock(nn.Module):
         self.n_layers = len(feat_dims) - 1
 
         for idx, (in_feat, out_feat) in enumerate(zip(feat_dims[:-1], feat_dims[1:])):
-            direction_dim = feat_dims[idx] if self.dynamic_efeats == 'prev' else feat_dims[0]
+            direction_dim = (feat_dims[idx] if self.dynamic_efeats == 'prev'
+                             else 2 if self.dynamic_efeats == 'orig'
+                             else feat_dims[0])
             in_efeat_dim = self.static_efeats
             if self.dynamic_efeats != 'first': 
                 in_efeat_dim += self.euclidian + self.direction * direction_dim + self.n_weights
@@ -218,7 +225,9 @@ class GNNBlock(nn.Module):
     def forward(self, v, data, weights=None):
         vres = v
         for layer in range(self.n_layers):
-            vsrc = v if self.euclidian == 'prev' else vres
+            vsrc = (v if self.dynamic_efeats == 'prev' 
+                    else data.pos if self.dynamic_efeats == 'orig' 
+                    else vres)
             get_extra = not (self.dynamic_efeats == 'first' and layer != 0)
 
             e = self._get_edge_feat(vsrc, data,
