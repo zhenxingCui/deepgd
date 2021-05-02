@@ -221,6 +221,22 @@ class GNNBlock(nn.Module):
             w = weights.repeat(len(e), 1)
             e = torch.cat([e, w], dim=1)
         return e
+    
+    def _get_dynamic_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
+        if euclidian or direction:
+            start_pos, end_pos = get_edges(pos, data)
+            u, d = l2_normalize(end_pos - start_pos, return_norm=True)
+            if euclidian and direction:
+                e = torch.cat([u, d], dim=1)
+            else:
+                if euclidian:
+                    e = u
+                if direction:
+                    e = d
+        if weights is not None:
+            w = weights.repeat(len(e), 1)
+            e = torch.cat([e, w], dim=1)
+        return e
         
     def forward(self, v, data, weights=None):
         vres = v
@@ -229,11 +245,12 @@ class GNNBlock(nn.Module):
                     else data.pos if self.dynamic_efeats == 'orig' 
                     else vres)
             get_extra = not (self.dynamic_efeats == 'first' and layer != 0)
+            efeat_fn = self._get_dynamic_edge_feat if self.static_efeats == 0 else self._get_edge_feat
 
-            e = self._get_edge_feat(vsrc, data,
-                                    euclidian=self.euclidian and get_extra, 
-                                    direction=self.direction and get_extra,
-                                    weights=weights if get_extra and self.n_weights > 0 else None)
+            e = efeat_fn(vsrc, data,
+                         euclidian=self.euclidian and get_extra, 
+                         direction=self.direction and get_extra,
+                         weights=weights if get_extra and self.n_weights > 0 else None)
             v = self.gnn[layer](v, e, data)
         return v + vres if self.residual else v
 
