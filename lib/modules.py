@@ -212,7 +212,7 @@ class GNNBlock(nn.Module):
         e = data.edge_attr[:, :self.static_efeats]
         if euclidian or direction:
             start_pos, end_pos = get_edges(pos, data)
-            u, d = l2_normalize(end_pos - start_pos, return_norm=True)
+            d, u = l2_normalize(end_pos - start_pos, return_norm=True)
             if euclidian:
                 e = torch.cat([e, u], dim=1)
             if direction:
@@ -225,7 +225,7 @@ class GNNBlock(nn.Module):
     def _get_dynamic_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
         if euclidian or direction:
             start_pos, end_pos = get_edges(pos, data)
-            u, d = l2_normalize(end_pos - start_pos, return_norm=True)
+            d, u = l2_normalize(end_pos - start_pos, return_norm=True)
             if euclidian and direction:
                 e = torch.cat([u, d], dim=1)
             else:
@@ -348,7 +348,7 @@ class Model(nn.Module):
 #         e = torch.zeros(len(data.model_edge_index), 0) if data.model_edge_attr is None else data.model_edge_attr
 #         if euclidian or direction:
 #             start_pos, end_pos = get_full_edges(pos, data)
-#             u, d = l2_normalize(end_pos - start_pos, return_norm=True)
+#             d, u = l2_normalize(end_pos - start_pos, return_norm=True)
 #             if euclidian:
 #                 e = torch.cat([e, u], dim=1)
 #             if direction:
