@@ -500,6 +500,8 @@ def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=Fal
         dis_data.edge_index = dis_data.raw_edge_index
     if pos is None:
         dis_data.pos = rescale_with_minimized_stress(dis_data.gt_pos, dis_data)
+    elif type(pos) is int:
+        dis_data.pos = torch.ones_like(dis_data.gt_pos) * pos
     else:
         dis_data.pos = interpolate * rescale_with_minimized_stress(dis_data.gt_pos, dis_data) + (1 - interpolate) * rescale_with_minimized_stress(pos, dis_data)
     return dis_data
