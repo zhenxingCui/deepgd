@@ -514,7 +514,8 @@ class Generator(nn.Module):
                  n_weights=0, 
                  dynamic_efeats='skip',
                  euclidian=True,
-                 direction=True):
+                 direction=True,
+                 residual=True):
         super().__init__()
 
         self.in_blocks = nn.ModuleList([
@@ -531,7 +532,7 @@ class Generator(nn.Module):
                      euclidian=euclidian,
                      direction=direction,
                      n_weights=n_weights,
-                     residual=True)
+                     residual=residual)
             for _ in range(num_blocks)
         ])
         self.out_blocks = nn.ModuleList([
