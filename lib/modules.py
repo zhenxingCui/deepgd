@@ -512,8 +512,9 @@ class Generator(nn.Module):
     def __init__(self, 
                  num_blocks=9, 
                  n_weights=0, 
+                 dynamic_efeats='skip',
                  euclidian=True,
-                 direction=True,):
+                 direction=True):
         super().__init__()
 
         self.in_blocks = nn.ModuleList([
@@ -526,11 +527,11 @@ class Generator(nn.Module):
                      act=True,
                      dp=0.2, 
                      static_efeats=2,
-                     dynamic_efeats='skip',
+                     dynamic_efeats=dynamic_efeats,
                      euclidian=euclidian,
-                     direction=True,
+                     direction=direction,
                      n_weights=n_weights,
-                     residual=direction)
+                     residual=True)
             for _ in range(num_blocks)
         ])
         self.out_blocks = nn.ModuleList([
