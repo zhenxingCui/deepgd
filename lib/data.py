@@ -13,6 +13,11 @@ def generate_random_index(data_path='data/rome',
         for f in file_names:
             print(f, file=fout) 
             
+
+def generate_random_index_large_graph(data_path='data/rome', 
+                                      index_file='data_index.txt'):
+    pass
+            
             
 @cache()
 def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
