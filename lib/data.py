@@ -58,7 +58,7 @@ def generate_data_list(G, *,
     def generate_apsp(G):
         n = G.number_of_nodes()
         apsp_gen = nx.all_pairs_shortest_path_length(G)
-        return np.array([np.fromiter(j.values(), int)[np.argsort(np.fromiter(j.keys(), int))] for i, j in tqdm(apsp_gen, total=n)])
+        return np.array([np.fromiter(j.values(), int)[np.argsort(np.fromiter(j.keys(), int))] for i, j in apsp_gen])
     
     def get_neighborhood_size(apsp):
         return np.cumsum(np.apply_along_axis(lambda x: np.bincount(x, minlength=len(apsp)), 1, apsp), axis=1)
