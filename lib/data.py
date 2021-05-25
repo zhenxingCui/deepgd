@@ -4,6 +4,12 @@ from .layouts import *
 from .functions import *
 
 
+def load_mtx(file):
+    data = scipy.io.mmread(file)
+    G = nx.from_scipy_sparse_matrix(data)
+    return G
+
+
 def generate_random_index(data_path='data/rome', 
                           index_file='data_index.txt'):
     files = glob.glob(f'{data_path}/*.graphml')
@@ -50,8 +56,9 @@ def generate_data_list(G, *,
                        device='cpu'):
     
     def generate_apsp(G):
-        apsp_dict = dict(nx.all_pairs_shortest_path_length(G))
-        return np.array([[apsp_dict[j][k] for k in sorted(apsp_dict[j].keys())] for j in sorted(apsp_dict.keys())])
+        n = G.number_of_nodes()
+        apsp_gen = nx.all_pairs_shortest_path_length(G)
+        return np.array([np.fromiter(j.values(), int)[np.argsort(np.fromiter(j.keys(), int))] for i, j in tqdm(apsp_gen, total=n)])
     
     def get_neighborhood_size(apsp):
         return np.cumsum(np.apply_along_axis(lambda x: np.bincount(x, minlength=len(apsp)), 1, apsp), axis=1)
@@ -359,17 +366,19 @@ def generate_data_list(G, *,
     n = G.number_of_nodes()
     m = G.number_of_edges()
     apsp = generate_apsp(G)
-    neighborhood = get_neighborhood_size(apsp)
     full_elist = generate_full_edge_list(G)
     full_eattr = generate_regular_edge_attr(G, full_elist, apsp)
+    ground_truth = generate_initial_node_attr(G, mode='gviz')
     data = Data(x=torch.zeros(n, device=device), n=n, m=m,
                 raw_edge_index=create_edge_index(G.edges),
-                raw_edge_attr=torch.ones(G.number_of_edges()*2, 2).to(device),
-                gt_pos = generate_initial_node_attr(G, mode='gviz').to(device),
+#                 raw_edge_attr=torch.ones(G.number_of_edges()*2, 2).to(device),
+                gt_pos = ground_truth.to(device) if ground_truth is not None else None,
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
+    
     if init_mode is not None:
         data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
+    
     if noisy_layout:
         proper = get_proper_layout(G)
         data.random_normal, data.random_normal_r = generate_noisy_pos(G, get_random_normal_layout, proper)
@@ -379,6 +388,7 @@ def generate_data_list(G, *,
         data.flip_nodes, data.flip_nodes_r = generate_noisy_pos(G, get_flip_nodes_layout, proper)
         data.flip_edges, data.flip_edges_r = generate_noisy_pos(G, get_flip_edges_layout, proper)
         data.movlsq, data.movlsq_r = generate_noisy_pos(G, get_movlsq_layout, proper)
+    
     if sparse:
         if sparse == 'sqrt':
             k = np.round(np.sqrt(n))
@@ -392,6 +402,7 @@ def generate_data_list(G, *,
             k = sparse
         k = int(k)
         
+        neighborhood = get_neighborhood_size(apsp)
         group_tree = get_recursive_pivot_groups(G.nodes, apsp, 5)
         cardinalities = get_pivot_group_cardinalities(group_tree)
         
