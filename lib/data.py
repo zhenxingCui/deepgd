@@ -12,17 +12,7 @@ def generate_random_index(data_path='data/rome',
     with open(index_file, "w") as fout:
         for f in file_names:
             print(f, file=fout) 
-            
-
-def generate_random_index_large_graph(data_path='data/new_large_graph', 
-                                      index_file='data_large_index.txt'):
-    files = glob.glob(f'{data_path}/*.mtx')
-    file_names = list(map(os.path.basename, files))
-    random.shuffle(file_names)
-    with open(index_file, "w") as fout:
-        for f in file_names:
-            print(f, file=fout) 
-            
+           
             
 @cache()
 def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
