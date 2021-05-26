@@ -371,7 +371,7 @@ def generate_data_list(G, *,
     ground_truth = generate_initial_node_attr(G, mode='gviz')
     data = Data(x=torch.zeros(n, device=device), n=n, m=m,
                 raw_edge_index=create_edge_index(G.edges),
-#                 raw_edge_attr=torch.ones(G.number_of_edges()*2, 2).to(device),
+                raw_edge_attr=torch.ones(G.number_of_edges()*2, 2).to(device),
                 gt_pos = ground_truth.to(device) if ground_truth is not None else None,
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
