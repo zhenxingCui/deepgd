@@ -513,6 +513,7 @@ class Generator(nn.Module):
                  num_blocks=9, 
                  num_layers=3,
                  num_enet_layers=2,
+                 layer_dims=None,
                  n_weights=0, 
                  dynamic_efeats='skip',
                  euclidian=True,
@@ -524,7 +525,7 @@ class Generator(nn.Module):
             GNNBlock(feat_dims=[2, 8, 8], bn=True, dp=0.2, static_efeats=2)
         ])
         self.hid_blocks = nn.ModuleList([
-            GNNBlock(feat_dims=[8] + [8] * num_layers, 
+            GNNBlock(feat_dims=layer_dims or ([8] + [8] * num_layers), 
                      efeat_hid_dims=[16] * (num_enet_layers - 1),
                      bn=True, 
                      act=True,
