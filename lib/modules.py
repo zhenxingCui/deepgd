@@ -522,7 +522,7 @@ class Generator(nn.Module):
         super().__init__()
 
         self.in_blocks = nn.ModuleList([
-            GNNBlock(feat_dims=[2, 8, 8], bn=True, dp=0.2, static_efeats=2)
+            GNNBlock(feat_dims=[2, 8, 8 if layer_dims is None else layer_dims[0]], bn=True, dp=0.2, static_efeats=2)
         ])
         self.hid_blocks = nn.ModuleList([
             GNNBlock(feat_dims=layer_dims or ([8] + [8] * num_layers), 
@@ -539,7 +539,7 @@ class Generator(nn.Module):
             for _ in range(num_blocks)
         ])
         self.out_blocks = nn.ModuleList([
-            GNNBlock(feat_dims=[8, 8], bn=True, static_efeats=2),
+            GNNBlock(feat_dims=[8 if layer_dims is None else layer_dims[-1], 8], bn=True, static_efeats=2),
             GNNBlock(feat_dims=[8, 2], act=False, static_efeats=2)
         ])
 
