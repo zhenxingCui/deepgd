@@ -140,7 +140,7 @@ class CompositeLoss(nn.Module):
 class AdaptiveWeightCompositeLoss(nn.Module):
     def __init__(self, criteria, importance=None):
         super().__init__()
-        self.importance = np.ones(len(criteria)) if importance is None else np.array(weights)
+        self.importance = np.ones(len(criteria)) if importance is None else np.array(importance)
         self.importance = self.importance / sum(self.importance)
         self.criteria = criteria
         
