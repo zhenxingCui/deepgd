@@ -77,7 +77,7 @@ class SoftAdaptController:
 
     def get_last_policy(self):
         return self.last_policy
-
+    
 
 class FixedWeightController:
     def __init__(self, criteria, *, gamma=None, **kwargs):
@@ -135,6 +135,29 @@ class CompositeLoss(nn.Module):
         if return_components:
             result += (components,)
         return result[0] if len(result) == 1 else result
+    
+    
+class AdaptiveWeightCompositeLoss(nn.Module):
+    def __init__(self, criteria, importance=None):
+        super().__init__()
+        self.importance = np.ones(len(criteria)) if importance is None else np.array(weights)
+        self.importance = self.importance / sum(self.importance)
+        self.criteria = criteria
+        
+    def __len__(self):
+        return len(self.criteria)
+        
+    def forward(self, *args, return_components=False, **kwargs):
+        losses = []
+        components = []
+        for criterion, imp in zip(self.criteria, self.importance):
+            loss = criterion(*args, **kwargs)
+            losses.append(loss * imp / loss.item())
+            components.append(loss)
+        result = sum(losses)
+        if return_components:
+            return (result, components)
+        return result
         
         
 class GNNLayer(nn.Module):
