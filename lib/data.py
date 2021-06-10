@@ -358,8 +358,8 @@ def generate_data_list(G, *,
                                    init_mode=init_mode,
                                    edge_index=edge_index,
                                    edge_attr=edge_attr,
-                                   pmds_list=pmds_list[i],
-                                   gviz_list=gviz_list[i],
+                                   pmds_list=None if pmds_list is None else pmds_list[i],
+                                   gviz_list=None if gviz_list is None else gviz_list[i],
                                    noisy_layout=noisy_layout,
                                    device=device)
                 for i, g in enumerate(tqdm(G, desc='preprocess G'))]
@@ -377,7 +377,9 @@ def generate_data_list(G, *,
                 full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
     
     if init_mode is not None:
-        data.pos = generate_initial_node_attr(G, mode=init_mode).to(device)
+        data.pos = generate_initial_node_attr(G, mode=init_mode)
+        if data.pos is not None:
+            data.pos.to(device)
     
     if noisy_layout:
         proper = get_proper_layout(G)
