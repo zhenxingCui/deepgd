@@ -297,7 +297,8 @@ def graph_vis(G, node_pos, file_name=None, **kwargs):
     for i, (n, p) in enumerate(node_pos):
         G.nodes[i]['pos'] = n, p
     pos = nx.get_node_attributes(G, name='pos')
-    plt.figure()
+    if file_name is not None:
+        plt.figure()
     nx.draw(G, pos, **graph_attr)
     plt.axis('equal')
     if file_name is not None:
