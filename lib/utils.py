@@ -287,6 +287,7 @@ def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None,
     
     
 def graph_vis(G, node_pos, file_name=None, **kwargs):
+    G = nx.Graph(G)
     graph_attr = dict(node_size=100, 
                       with_labels=False, 
                       labels=dict(zip(list(G.nodes), map(lambda n: n if type(n) is int else n[1:], list(G.nodes)))),
