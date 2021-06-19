@@ -161,13 +161,22 @@ class AdaptiveWeightCompositeLoss(nn.Module):
         
         
 class GNNLayer(nn.Module):
-    def __init__(self, in_vfeat, out_vfeat, in_efeat, edge_net=None, bn=False, act=False, dp=None, aggr='mean'):
+    def __init__(self, 
+                 in_vfeat, 
+                 out_vfeat, 
+                 in_efeat, 
+                 edge_net=None, 
+                 bn=False, 
+                 act=False, 
+                 dp=None, 
+                 aggr='mean',
+                 root_weight=True):
         super().__init__()
         self.enet = nn.Linear(in_efeat, in_vfeat * out_vfeat) if edge_net is None and in_efeat > 0 else edge_net
-        self.conv = gnn.NNConv(in_vfeat, out_vfeat, self.enet, aggr=aggr)
+        self.conv = gnn.NNConv(in_vfeat, out_vfeat, nn=self.enet, aggr=aggr, root_weight=root_weight)
         self.bn = gnn.BatchNorm(out_vfeat) if bn else nn.Identity()
         self.act = nn.LeakyReLU() if act else nn.Identity()
-        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
+        self.dp = dp and nn.Dropout(dp) or nn.Identity()
         
     def forward(self, v, e, data):
         v = self.conv(v, data.edge_index, e)
@@ -178,12 +187,15 @@ class GNNLayer(nn.Module):
 
 
 class GNNBlock(nn.Module):
-    def __init__(self, feat_dims, 
+    def __init__(self, 
+                 feat_dims, 
                  efeat_hid_dims=[], 
                  efeat_hid_acts=nn.LeakyReLU,
                  bn=False,
                  act=True,
                  dp=None,
+                 aggr='mean',
+                 root_weight=True,
                  static_efeats=1,
                  dynamic_efeats='skip',
                  euclidian=False,
@@ -229,7 +241,9 @@ class GNNBlock(nn.Module):
                                      edge_net=edge_net,
                                      bn=bn, 
                                      act=act, 
-                                     dp=dp))
+                                     dp=dp,
+                                     aggr='aggr',
+                                     root_weight=root_weight))
         
     def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
         e = data.edge_attr[:, :self.static_efeats]
