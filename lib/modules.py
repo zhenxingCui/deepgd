@@ -242,7 +242,7 @@ class GNNBlock(nn.Module):
                                      bn=bn, 
                                      act=act, 
                                      dp=dp,
-                                     aggr='aggr',
+                                     aggr=aggr,
                                      root_weight=root_weight))
         
     def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
