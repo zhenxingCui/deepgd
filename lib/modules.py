@@ -198,6 +198,7 @@ class GNNBlock(nn.Module):
                  root_weight=True,
                  static_efeats=1,
                  dynamic_efeats='skip',
+                 rich_efeats=False,
                  euclidian=False,
                  direction=False,
                  n_weights=0,
@@ -213,6 +214,7 @@ class GNNBlock(nn.Module):
         super().__init__()
         self.static_efeats = static_efeats
         self.dynamic_efeats = dynamic_efeats
+        self.rich_efeats = rich_efeats
         self.euclidian = euclidian
         self.direction = direction
         self.n_weights = n_weights
@@ -226,7 +228,7 @@ class GNNBlock(nn.Module):
                              else feat_dims[0])
             in_efeat_dim = self.static_efeats
             if self.dynamic_efeats != 'first': 
-                in_efeat_dim += self.euclidian + self.direction * direction_dim + self.n_weights
+                in_efeat_dim += self.euclidian + self.direction * direction_dim + self.n_weights + 6 * self.rich_efeats
             edge_net = nn.Sequential(*chain.from_iterable(
                 [nn.Linear(idim, odim),
                  nn.BatchNorm1d(odim),
@@ -245,21 +247,30 @@ class GNNBlock(nn.Module):
                                      aggr=aggr,
                                      root_weight=root_weight))
         
-    def _get_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
+    def _get_edge_feat(self, pos, data, rich_efeats=False, euclidian=False, direction=False, weights=None):
         e = data.edge_attr[:, :self.static_efeats]
         if euclidian or direction:
             start_pos, end_pos = get_edges(pos, data)
-            d, u = l2_normalize(end_pos - start_pos, return_norm=True)
+            v, u = l2_normalize(end_pos - start_pos, return_norm=True)
             if euclidian:
                 e = torch.cat([e, u], dim=1)
             if direction:
-                e = torch.cat([e, d], dim=1)
+                e = torch.cat([e, v], dim=1)
+            if rich_efeats:
+                d = e[:, :1]
+                d2 = d ** 2
+                d_inv = 1 / d
+                d2_inv = 1 / d2
+                u2 = u ** 2
+                u_inv = 1 / u
+                u2_inv = 1 / u2
+                e = torch.cat([e, d2, u2, d_inv, u_inv, d2_inv, u2_inv], dim=1)
         if weights is not None:
             w = weights.repeat(len(e), 1)
             e = torch.cat([e, w], dim=1)
         return e
     
-    def _get_dynamic_edge_feat(self, pos, data, euclidian=False, direction=False, weights=None):
+    def _get_dynamic_edge_feat(self, pos, data, rich_efeats=False, euclidian=False, direction=False, weights=None):
         if euclidian or direction:
             start_pos, end_pos = get_edges(pos, data)
             d, u = l2_normalize(end_pos - start_pos, return_norm=True)
@@ -285,6 +296,7 @@ class GNNBlock(nn.Module):
             efeat_fn = self._get_dynamic_edge_feat if self.static_efeats == 0 else self._get_edge_feat
 
             e = efeat_fn(vsrc, data,
+                         rich_efeats=self.rich_efeats and get_extra,
                          euclidian=self.euclidian and get_extra, 
                          direction=self.direction and get_extra,
                          weights=weights if get_extra and self.n_weights > 0 else None)
