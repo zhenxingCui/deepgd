@@ -228,7 +228,7 @@ class GNNBlock(nn.Module):
                              else feat_dims[0])
             in_efeat_dim = self.static_efeats
             if self.dynamic_efeats != 'first': 
-                in_efeat_dim += self.euclidian + self.direction * direction_dim + self.n_weights + 6 * self.rich_efeats
+                in_efeat_dim += self.euclidian + self.direction * direction_dim + self.n_weights + 3 * self.rich_efeats
             edge_net = nn.Sequential(*chain.from_iterable(
                 [nn.Linear(idim, odim),
                  nn.BatchNorm1d(odim),
@@ -259,12 +259,13 @@ class GNNBlock(nn.Module):
             if rich_efeats:
                 d = e[:, :1]
                 d2 = d ** 2
-                d_inv = 1 / d
-                d2_inv = 1 / d2
+#                 d_inv = 1 / d
+#                 d2_inv = 1 / d2
                 u2 = u ** 2
-                u_inv = 1 / u
-                u2_inv = 1 / u2
-                e = torch.cat([e, d2, u2, d_inv, u_inv, d2_inv, u2_inv], dim=1)
+                ud = u * d
+#                 u_inv = 1 / u
+#                 u2_inv = 1 / u2
+                e = torch.cat([e, d2, u2, ud], dim=1)
         if weights is not None:
             w = weights.repeat(len(e), 1)
             e = torch.cat([e, w], dim=1)
