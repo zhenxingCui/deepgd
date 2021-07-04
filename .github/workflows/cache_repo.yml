@@ -34,7 +34,8 @@ jobs:
           du -sh *
           
       # Upload repository as artifact
-      - uses: actions/upload-artifact@master
+      - name: Upload repository as artifact
+        uses: actions/upload-artifact@master
         with:
           name: deepgd
           path: .
