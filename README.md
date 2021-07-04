@@ -1,7 +1,7 @@
 # DeepGD: A Deep Learning Framework for Graph Drawing Using GNN
 
 ## Introduction
-This is the code repository for the IEEE CG&A21 Paper entitled "[DeepGD: A Deep Learning Framework for Graph Drawing Using GNN](arXiv: https://arxiv.org/abs/2106.15347)".
+This is the code repository for the IEEE CG&A21 Paper entitled "(DeepGD: A Deep Learning Framework for Graph Drawing Using GNN)[arXiv: https://arxiv.org/abs/2106.15347]".
 
 ## Citation
 If you find our work useful in your research, please consider citing:
