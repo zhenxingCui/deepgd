@@ -38,3 +38,4 @@ jobs:
           echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
           cat ~/.config/rclone/rclone.conf
           # rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
+          rclone lsd remote:deepgd
