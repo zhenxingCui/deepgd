@@ -48,4 +48,7 @@ jobs:
           
           cat ~/.config/rclone/rclone.conf
           # rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
-          rclone lsd remote:deepgd
+          # rclone lsd remote:deepgd
+          
+      - name: Setup Debug Session
+        uses: csexton/debugger-action@master
