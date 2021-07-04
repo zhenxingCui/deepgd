@@ -505,7 +505,7 @@ def generate_data_list(G, *,
     return data
 
 
-def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=True, rescale=True):
+def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=True, rescale=False):
     dis_data = copy.copy(data)
     if complete_graph:
         dis_data.edge_index = dis_data.full_edge_index
@@ -513,11 +513,10 @@ def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=Tru
     else:
         dis_data.edge_index = dis_data.raw_edge_index
     if pos is None:
-        dis_data.pos = dis_data.gt_pos
+        dis_data.pos = rescale_with_minimized_stress(dis_data.gt_pos, dis_data)
     else:
-        dis_data.pos = interpolate * dis_data.gt_pos + (1 - interpolate) * pos
-    if rescale:
-        dis_data.pos = rescale_with_minimized_stress(dis_data.pos, dis_data)
+        pos = rescale_with_minimized_stress(pos, dis_data) if rescale else pos
+        dis_data.pos = interpolate * rescale_with_minimized_stress(dis_data.gt_pos, dis_data) + (1 - interpolate) * pos
     return dis_data
 
 
