@@ -34,11 +34,11 @@ jobs:
           du -sh *
           
       - name: Archive repository
-        run: tar -cvf ../deepgd.tar .
+        run: tar -cvf deepgd.tar .
           
       # Upload repository as artifact
       - name: Upload repository as artifact
         uses: actions/upload-artifact@master
         with:
           name: deepgd.tar
-          path: ../deepgd.tar
+          path: deepgd.tar
