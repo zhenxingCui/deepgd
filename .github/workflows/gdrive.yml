@@ -38,7 +38,7 @@ jobs:
           printf "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
           
       - name: Upload to Google Drive
-        run: rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
+        run: rclone sync -vLc --exclude='{.*,.*/**}' . remote:deepgd
           
 #       - name: Setup Debug Session
 #         uses: csexton/debugger-action@master
