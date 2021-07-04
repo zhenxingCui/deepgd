@@ -31,13 +31,7 @@ jobs:
       - uses: actions/checkout@v2
 
       # Runs a single command using the runners shell
-      - name: List working directory
+      - name: Show workspace content
         run: |
           pwd
-          ls
-
-      # Runs a single command using the runners shell
-      - name: List $GITHUB_WORKSPACE
-        run: |
-          echo $GITHUB_WORKSPACE
-          ls $GITHUB_WORKSPACE
+          du -sh *
