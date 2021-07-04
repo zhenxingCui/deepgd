@@ -37,4 +37,6 @@ jobs:
           
       # Runs a single command using the runners shell
       - name: List $GITHUB_WORKSPACE
-        run: ls $GITHUB_WORKSPACE
+        run: |
+          pwd
+          ls $GITHUB_WORKSPACE
