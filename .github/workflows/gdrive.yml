@@ -33,9 +33,8 @@ jobs:
         env:
           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
         run: |
-          echo $RCLONE_CONFIG
-        # curl https://rclone.org/install.sh | sudo bash
-        # mkdir -p ~/.config/rclone
-        # echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
-        # rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
-        # cat ~/.config/rclone/rclone.conf
+          # curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
+          # rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
+          cat ~/.config/rclone/rclone.conf
