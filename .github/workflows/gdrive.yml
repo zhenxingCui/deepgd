@@ -30,12 +30,12 @@ jobs:
           du -sh *
           
       - name: Upload to Google Drive
-        env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+#         env:
+#           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone
-          echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
+          # echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
           
           cat > ~/.config/rclone/rclone.conf <<-EOF
           [remote]
