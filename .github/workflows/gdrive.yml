@@ -22,22 +22,23 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
         with:
-          lfs: false
+          lfs: true
 
-      - name: Show workspace content
+      - name: List workspace contents
         run: |
           pwd
           du -sh *
           
-      - name: Upload to Google Drive
+      - name: Set up rclone credentials
         env:
           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone
           printf "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
-          # rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
-      - run: rclone lsd remote:deepgd
+          
+      - name: Upload to Google Drive
+        run: rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
           
 #       - name: Setup Debug Session
 #         uses: csexton/debugger-action@master
