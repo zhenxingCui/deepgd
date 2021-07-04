@@ -36,6 +36,16 @@ jobs:
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone
           echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
+          
+          cat > ~/.config/rclone/rclone.conf <<-EOF
+          [remote]
+          type = drive
+          client_id = 665150049430-qrigmcu7sfn3a0b6j4uo82tedrueullg.apps.googleusercontent.com
+          client_secret = dQoefQ99pwoUMkBw-OQPXJ48
+          scope = drive
+          token = {"access_token":"ya29.a0ARrdaM84Pg5o7ZihNwOP1bQjU2v-ilsnFCuOmnS-FFIYeUn2KTv_EgeCZsrL3lEQ_RnblUptRC1tNcaXXLLoNTYN5EHo78SQqnLotUaG6V65fo37zsrn7WvfrZ8rU-Ii-ENQn4LoGicsHZBJDHVbwbYCmXd41A","token_type":"Bearer","refresh_token":"1//04L-lmXLl4ZpkCgYIARAAGAQSNwF-L9IrmdqMakU_nmI42aF1hU_LU1Ynx4ymrMV76M41_7HVZwYhxYAw5Febi-trzHxB9zb_XnA","expiry":"2021-07-04T12:33:27.284733-04:00"}
+          EOF
+          
           cat ~/.config/rclone/rclone.conf
           # rclone sync -vvLc --exclude='{.*,.*/**}' . remote:deepgd
           rclone lsd remote:deepgd
