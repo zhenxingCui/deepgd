@@ -25,7 +25,7 @@ jobs:
           pwd
           du -sh *
           
-      - name: Set up rclone credentials
+      - name: Install and configure rclone
         env:
           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
         run: |
@@ -33,7 +33,7 @@ jobs:
           mkdir -p ~/.config/rclone
           printf "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
           
-      - name: Upload to Google Drive
+      - name: Upload workspace to Google Drive
         run: rclone sync -vLc --exclude='{.*,.*/**}' . remote:deepgd
           
 #       - name: Setup Debug Session
