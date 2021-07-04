@@ -190,7 +190,8 @@ class GNNBlock(nn.Module):
     def __init__(self, 
                  feat_dims, 
                  efeat_hid_dims=[], 
-                 efeat_hid_acts=nn.LeakyReLU,
+                 efeat_hid_act=nn.LeakyReLU,
+                 efeat_out_act=nn.Tanh,
                  bn=False,
                  act=True,
                  dp=None,
@@ -235,7 +236,7 @@ class GNNBlock(nn.Module):
                  act()]
                 for idim, odim, act in zip([in_efeat_dim] + efeat_hid_dims,
                                            efeat_hid_dims + [in_feat * out_feat],
-                                           [efeat_hid_acts] * len(efeat_hid_dims) + [nn.Tanh])
+                                           [efeat_hid_act] * len(efeat_hid_dims) + [efeat_out_act])
             ))
             self.gnn.append(GNNLayer(in_vfeat=in_feat, 
                                      out_vfeat=out_feat, 
