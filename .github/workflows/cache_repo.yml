@@ -27,18 +27,20 @@ jobs:
         with:
           lfs: true
 
-      # Runs a single command using the runners shell
       - name: Show workspace content
         run: |
           pwd
           du -sh *
           
-      - name: Archive repository
-        run: tar -cvf deepgd.tar .
-          
-      # Upload repository as artifact
-      - name: Upload repository as artifact
-        uses: actions/upload-artifact@master
-        with:
-          name: deepgd.tar
-          path: deepgd.tar
+      - name: Upload to Google Drive
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          cat > ~/.config/rclone/rclone.conf <<-EOF
+          [remote]
+          type = drive
+          client_id = 665150049430-qrigmcu7sfn3a0b6j4uo82tedrueullg.apps.googleusercontent.com
+          client_secret = dQoefQ99pwoUMkBw-OQPXJ48
+          scope = drive
+          token = {"access_token":"ya29.a0ARrdaM_TswlvlV6_P2FGqJaXUigMXQqjTkT6AMT5Xxows4YURI-KuOp7FS8bF_7_ncdBBz91QosU5wWGC69rMtcMVpc3TVY3_-ENf2GJPd1zWu13cx6Uj-WaVjNxOHQwRQIGRE7G73M0ZvmlZx2YFq4TiP2M","token_type":"Bearer","refresh_token":"1//04L-lmXLl4ZpkCgYIARAAGAQSNwF-L9IrmdqMakU_nmI42aF1hU_LU1Ynx4ymrMV76M41_7HVZwYhxYAw5Febi-trzHxB9zb_XnA","expiry":"2021-07-04T10:04:33.105474-04:00"}
+          EOF
+          rclone sync -PLc --exclude='{.*,.*/**}' . remote:deepgd
