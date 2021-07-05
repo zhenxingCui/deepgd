@@ -1,0 +1,40 @@
+name: Upload to Google Drive
+
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+        with:
+          lfs: true
+
+      - name: List workspace contents
+        run: |
+          pwd
+          du -sh *
+          
+      - name: Install and configure rclone
+        env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone
+          printf "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
+          
+      - name: Upload workspace to Google Drive
+        run: rclone sync -vLc --exclude='{.*,.*/**}' . remote:deepgd
+          
+#       - name: Setup Debug Session
+#         uses: csexton/debugger-action@master
