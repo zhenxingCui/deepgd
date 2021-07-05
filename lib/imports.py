@@ -13,7 +13,7 @@ import warnings
 from itertools import chain, combinations
 from functools import reduce, lru_cache
 
-import nvidia_smi
+import pynvml
 from tqdm.notebook import tqdm
 
 import numpy as np

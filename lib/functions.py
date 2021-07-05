@@ -166,7 +166,7 @@ def get_min_angle(radians):
     return radians.min().div(2*np.pi).mul(360)
 
 
-def rescale_with_minimized_stress(pos, batch, return_scale=False):
+def rescale_with_minimized_stress(pos, batch, center=True, return_scale=False):
     batch = batch.to(pos.device)
     d = batch.full_edge_attr[:, 0]
     w = 1/d**2
@@ -175,6 +175,8 @@ def rescale_with_minimized_stress(pos, batch, return_scale=False):
     dist = diff.norm(dim=1)
     scale = (w * d * dist).sum() / (w * dist * dist).sum()
     scaled_pos = pos * scale
+    if center:
+        scaled_pos -= scaled_pos.mean(dim=0)
     if return_scale:
         return scaled_pos, scale
     return scaled_pos
