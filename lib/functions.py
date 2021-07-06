@@ -189,6 +189,21 @@ def get_ground_truth(data, G, prog='neato', scaled=True):
     return gt
 
 
+def get_pmds_layout(data, G, pmds_bin='hde/pmds', get_raw=False, rescale=True):
+    indot = str(nx.nx.nx_pydot.to_pydot(G))
+    outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
+    G = nx.nx_pydot.from_pydot(pydot.graph_from_dot_data(outdot)[0])
+    raw_layout = nx.get_node_attributes(G, 'pos')
+    layout = {int(n): tuple(map(float, pos.replace('"', '').split(','))) for n, pos in raw_layout.items()}
+    sorted_layout = dict(sorted(layout.items(), key=lambda pair: pair[0]))
+    if not get_raw:
+        pos = torch.tensor(list(sorted_layout.values()))
+        if rescale:
+            pos = rescale_with_minimized_stress(pos, data)
+        return pos
+    return sorted_layout
+
+
 def get_adj(batch, reverse=False, value=1):
     device = batch.x.device
     adj = torch.zeros(batch.num_nodes, batch.num_nodes).to(device)
