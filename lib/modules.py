@@ -569,7 +569,7 @@ class Generator(nn.Module):
                  dynamic_efeats='skip',
                  euclidian=True,
                  direction=True,
-                 residual=True
+                 residual=True,
                  normalize=False):
         super().__init__()
 
