@@ -113,3 +113,16 @@ def get_proper_layout(G):
 
 def layout_to_pos(layout):
     return torch.tensor(list(layout.values()))
+
+class LayoutGenerator(ABC):
+    def __init__(self, name, requires=[], normalize=True):
+        self.name = name
+        self.requires = requires
+        
+    @abstractmethod
+    def generate(self, G, dependencies):
+        pass
+        
+    def __call__(self, G, layouts)
+        dependencies = {r: layouts[r] for r in self.requires}
+        layout = self.generate(G, dependencies)

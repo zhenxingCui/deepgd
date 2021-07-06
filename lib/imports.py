@@ -14,6 +14,7 @@ import concurrent
 import subprocess
 from itertools import chain, combinations
 from functools import reduce, lru_cache
+from abc import ABC, abstractmethod
 
 import pynvml
 from tqdm.notebook import tqdm

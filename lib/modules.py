@@ -569,9 +569,11 @@ class Generator(nn.Module):
                  dynamic_efeats='skip',
                  euclidian=True,
                  direction=True,
-                 residual=True):
+                 residual=True
+                 normalize=False):
         super().__init__()
 
+        self.normalize = normalize
         self.in_blocks = nn.ModuleList([
             GNNBlock(feat_dims=[2, 8, 8 if layer_dims is None else layer_dims[0]], bn=True, dp=0.2, static_efeats=2)
         ])
@@ -607,6 +609,8 @@ class Generator(nn.Module):
                 hidden.append(v.detach().cpu().numpy() if numpy else v)
         if not output_hidden:
             vout = v.detach().cpu().numpy() if numpy else v
+            if self.normalize:
+                vout = rescale_with_minimized_stress(vout, data)
         
         return hidden if output_hidden else vout
     
