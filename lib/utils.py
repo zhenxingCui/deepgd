@@ -199,7 +199,7 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
     with torch.no_grad():
         model.eval()
         data = preprocess_batch(model, data)
-        stress_criterion = NormalizedStressLoss()
+        stress_criterion = Stress()
         l1_angle_criterion = L1AngularLoss()
         edge_criterion = FixedMeanEdgeLengthVarianceLoss()
         ring_criterion = ExponentialRingLoss()
@@ -269,7 +269,7 @@ def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None,
     if type(data) is not Batch:
         data = Batch.from_data_list([data])
         
-    stress_criterion = StressLoss()
+    stress_criterion = Stress()
 
     if gt_stress is None:
         gt = get_ground_truth(data, G)
