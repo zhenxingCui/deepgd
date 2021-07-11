@@ -145,4 +145,4 @@ class Hud:
         self.handle = display(display_id=self.id)
 
     def __call__(self, data):
-        self.handle.update(pd.DataFrame(data))
+        self.handle.update(pd.DataFrame({key: [data[key]] for key in data}))
