@@ -135,3 +135,12 @@ class StaticConfig:
     
     def __str__(self):
         return str(self[None])
+    
+    
+class Hud:
+    def __init__(self, id=None):
+        self.id = id or format(random.randrange(16**8), '08x')
+        self.handle = display(display_id=self.id)
+
+    def __call__(self, data):
+        self.handle.update(pd.DataFrame(data))
