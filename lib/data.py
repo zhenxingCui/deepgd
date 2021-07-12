@@ -506,8 +506,7 @@ def generate_data_list(G, *,
     return data
 
 
-def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=True):
-    normalize = Normalization()
+def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=True, normalize=Normalization()):
     dis_data = copy.copy(data)
     if complete_graph:
         dis_data.edge_index = dis_data.full_edge_index

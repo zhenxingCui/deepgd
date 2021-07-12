@@ -75,7 +75,7 @@ class RotateByPCA(nn.Module):
     
     
 class Normalization(nn.Module):
-    def __init__(self, return_rotation=False):
+    def __init__(self):
         super().__init__()
         self.scale = RescaleByDensity()
         self.rotate = RotateByPCA()
@@ -85,5 +85,18 @@ class Normalization(nn.Module):
         batch = make_batch(data)
         pos = self.scale(pos, batch)
         pos = self.rotate(pos, batch)
+        pos = self.center(pos, batch)
+        return pos
+    
+    
+class StressMajorizationAndCenter(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.scale = RescaleByStress()
+        self.center = ZeroCenter()
+        
+    def forward(self, pos, data):
+        batch = make_batch(data)
+        pos = self.scale(pos, batch)
         pos = self.center(pos, batch)
         return pos
