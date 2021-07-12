@@ -165,45 +165,6 @@ def get_resolution_score(radians, node_degrees, node_indices):
 def get_min_angle(radians):
     return radians.min().div(2*np.pi).mul(360)
 
-
-def rescale_with_minimized_stress(pos, batch, center=True, return_scale=False):
-    batch = batch.to(pos.device)
-    d = batch.full_edge_attr[:, 0]
-    w = 1/d**2
-    start, end = get_full_edges(pos, batch)
-    diff = end - start
-    dist = diff.norm(dim=1)
-    scale = (w * d * dist).sum() / (w * dist * dist).sum()
-    scaled_pos = pos * scale
-    if center:
-        scaled_pos -= scaled_pos.mean(dim=0)
-    if return_scale:
-        return scaled_pos, scale
-    return scaled_pos
-
-
-def get_ground_truth(data, G, prog='neato', scaled=True):
-    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.edge_attr.device)
-    if scaled:
-        gt = rescale_with_minimized_stress(gt, data)
-    return gt
-
-
-def get_pmds_layout(data, G, pmds_bin='hde/pmds', get_raw=False, rescale=True):
-    indot = str(nx.nx.nx_pydot.to_pydot(G))
-    outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
-    G = nx.nx_pydot.from_pydot(pydot.graph_from_dot_data(outdot)[0])
-    raw_layout = nx.get_node_attributes(G, 'pos')
-    layout = {int(n): tuple(map(float, pos.replace('"', '').split(','))) for n, pos in raw_layout.items()}
-    sorted_layout = dict(sorted(layout.items(), key=lambda pair: pair[0]))
-    if not get_raw:
-        pos = torch.tensor(list(sorted_layout.values()))
-        if rescale:
-            pos = rescale_with_minimized_stress(pos, data)
-        return pos
-    return sorted_layout
-
-
 def get_adj(batch, reverse=False, value=1):
     device = batch.x.device
     adj = torch.zeros(batch.num_nodes, batch.num_nodes).to(device)
@@ -235,3 +196,9 @@ def graph_wise_normalize(batch, mat):
     sum_mat = adj * mat.sum(dim=0, keepdim=True)
     sum_mat = adj * sum_mat.sum(dim=1, keepdim=True)
     return mat / (sum_mat + 1e-5) 
+
+def make_batch(data):
+    if type(data) is not Batch:
+        data = Batch.from_data_list([data])
+    return data
+    

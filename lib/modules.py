@@ -1,5 +1,6 @@
 from .imports import *
 from .functions import *
+from .normalizations import *
 
 
 class SoftAdaptController:
@@ -331,10 +332,12 @@ class Model(nn.Module):
             GNNBlock(feat_dims=[8, 8], bn=True, static_efeats=2),
             GNNBlock(feat_dims=[8, 2], act=False, static_efeats=2)
         ])
+        
+        self.normalize = Normalization()
 
     def forward(self, data, weights=None, output_hidden=False, numpy=False):
         v = data.pos if data.pos is not None else generate_rand_pos(len(data.x)).to(data.x.device)       
-        v = rescale_with_minimized_stress(v, data)
+        v = self.normalize(v, data)
           
         hidden = []
         for block in chain(self.in_blocks, 
@@ -443,10 +446,12 @@ class GNNGraphDrawing(nn.Module):
             GNNBlock(feat_dims=[8, 8], bn=True),
             GNNBlock(feat_dims=[8, 2], act=False)
         ])
+        
+        self.normalize = Normalization()
 
     def forward(self, data, weights=None, output_hidden=False, numpy=False, with_initial_pos=False):
         v = data.x if with_initial_pos else generate_rand_pos(len(data.x)).to(data.x.device)
-        v = rescale_with_minimized_stress(v, data)
+        v = self.normalize(v, data)
 
         hidden = []
         for block in chain(self.in_blocks, 
@@ -494,70 +499,7 @@ class DenseLayer(nn.Module):
         x = self.act(x)
         x = self.dp(x)
         return x
-        
 
-class EdgeFeatureDiscriminator(nn.Module):
-    def __init__(self, softplus=True):
-        super().__init__()
-        self.conv = GNNBlock(feat_dims=[2, 8, 8, 16, 16, 32], bn=True, dp=0.2, static_efeats=2)
-        self.dense1 = DenseLayer(in_channels=32, out_channels=16, bn=False, act=True, dp=0.3)
-        self.dense2 = DenseLayer(in_channels=16, out_channels=8, bn=False, act=True, dp=0.3)
-        self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
-        
-    def forward(self, batch):
-        x = self.conv(batch.pos, batch)
-        feats = gnn.global_mean_pool(x, batch.batch)
-        x = self.dense1(feats)
-        x = self.dense2(x)
-        x = self.dense3(x)
-        return x.flatten()
-        
-        
-class Discriminator(nn.Module):
-    def __init__(self, conv=5, dense=3, softplus=True):
-        super().__init__()
-        self.n_conv = conv;
-        self.n_dense = dense;
-        self.conv1 = GCNLayer(in_channels=2, out_channels=8, bn=False, act=True, dp=None)
-        self.conv2 = GCNLayer(in_channels=8, out_channels=16, bn=False, act=True, dp=0.1)
-        self.conv3 = GCNLayer(in_channels=16, out_channels=32, bn=False, act=True, dp=0.1)
-        if self.n_conv == 4:
-            self.conv4 = GCNLayer(in_channels=32, out_channels=128, bn=False, act=False, dp=None)
-        elif self.n_conv == 5:
-            self.conv4 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
-            self.conv5 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
-        elif self.n_conv == 6:
-            self.conv4 = GCNLayer(in_channels=32, out_channels=32, bn=False, act=True, dp=0.1)
-            self.conv5 = GCNLayer(in_channels=32, out_channels=64, bn=False, act=True, dp=0.1)
-            self.conv6 = GCNLayer(in_channels=64, out_channels=128, bn=False, act=False, dp=None)
-        if self.n_dense == 3:
-            self.dense1 = DenseLayer(in_channels=128, out_channels=32, bn=False, act=True, dp=0.3)
-            self.dense2 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
-            self.dense3 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
-        elif self.n_dense == 4:
-            self.dense1 = DenseLayer(in_channels=128, out_channels=64, bn=False, act=True, dp=0.3)
-            self.dense2 = DenseLayer(in_channels=64, out_channels=32, bn=False, act=True, dp=0.3)
-            self.dense3 = DenseLayer(in_channels=32, out_channels=8, bn=False, act=True, dp=0.3)
-            self.dense4 = DenseLayer(in_channels=8, out_channels=1, bn=False, act=nn.Softplus() if softplus else False, dp=None)
-        
-    def forward(self, batch):
-        x = self.conv1(batch.pos, batch)
-        x = self.conv2(x, batch)
-        x = self.conv3(x, batch)
-        x = self.conv4(x, batch)
-        if self.n_conv >= 5:
-            x = self.conv5(x, batch)
-        if self.n_conv >= 6:
-            x = self.conv6(x, batch)
-        feats = gnn.global_mean_pool(x, batch.batch)
-        x = self.dense1(feats)
-        x = self.dense2(x)
-        x = self.dense3(x)
-        if self.n_dense >= 4:
-            x = self.dense4(x)
-        
-        return x.flatten()
-    
     
 class Generator(nn.Module):
     def __init__(self, 
@@ -573,7 +515,6 @@ class Generator(nn.Module):
                  normalize=False):
         super().__init__()
 
-        self.normalize = normalize
         self.in_blocks = nn.ModuleList([
             GNNBlock(feat_dims=[2, 8, 8 if layer_dims is None else layer_dims[0]], bn=True, dp=0.2, static_efeats=2)
         ])
@@ -595,10 +536,11 @@ class Generator(nn.Module):
             GNNBlock(feat_dims=[8 if layer_dims is None else layer_dims[-1], 8], bn=True, static_efeats=2),
             GNNBlock(feat_dims=[8, 2], act=False, static_efeats=2)
         ])
+        self.normalize = Normalization() if normalize else None
 
     def forward(self, data, weights=None, output_hidden=False, numpy=False):
         v = data.pos if data.pos is not None else generate_rand_pos(len(data.x)).to(data.x.device)       
-        v = rescale_with_minimized_stress(v, data)
+        v = self.normalize(v, data)
         
         hidden = []
         for block in chain(self.in_blocks, 
@@ -609,8 +551,7 @@ class Generator(nn.Module):
                 hidden.append(v.detach().cpu().numpy() if numpy else v)
         if not output_hidden:
             vout = v.detach().cpu().numpy() if numpy else v
-            if self.normalize:
-                vout = rescale_with_minimized_stress(vout, data)
+            if self.normalize is not None:
+                vout = self.normalize(vout, data)
         
         return hidden if output_hidden else vout
-    

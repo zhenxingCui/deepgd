@@ -1,6 +1,7 @@
 from .imports import *
 from .functions import *
 from .modules import *
+from .normalizations import *
 from ipynb.fs.defs.losses import *
     
 
@@ -217,15 +218,15 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
     
         if eval_method is None:
             raw_pred = model(data, **model_params)
-            pred = rescale_with_minimized_stress(raw_pred, data)
+            pred = RescaleByStress()(raw_pred, data)
         elif eval_method == "tsne":
             hidden = model(data, output_hidden=True, numpy=True, **model_params)
             raw_pred = torch.tensor(tsne_project(hidden[-2]))
-            pred = rescale_with_minimized_stress(raw_pred, data)
+            pred = RescaleByStress()(raw_pred, data)
         elif eval_method == "umap":
             hidden = model(data, output_hidden=True, numpy=True, **model_params)
             raw_pred = torch.tensor(umap_project(hidden[-2]))
-            pred = rescale_with_minimized_stress(raw_pred, data)
+            pred = RescaleByStress()(raw_pred, data)
         
         stress = stress_criterion(pred, data)
         l1_angle = l1_angle_criterion(pred, data)

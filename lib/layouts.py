@@ -1,4 +1,5 @@
 from .imports import *
+from .normalizations import *
 
 def interpolate(layout1, layout2, r):
     return {node: tuple(np.average([layout1[node], layout2[node]], axis=0, weights=(1-r, r))) for node in layout1}
@@ -126,3 +127,23 @@ def layout_to_pos(layout):
 #     def __call__(self, G, layouts):
 #         dependencies = {r: layouts[r] for r in self.requires}
 #         layout = self.generate(G, dependencies)
+
+
+def get_ground_truth(data, G, prog='neato', scaled=True):
+    gt = torch.tensor(list(nx.nx_agraph.graphviz_layout(G, prog=prog).values())).to(data.edge_attr.device)
+    if scaled:
+        gt = Normalization()(gt, data)
+    return gt
+
+
+def get_pmds_layout(data, G, pmds_bin='hde/pmds', get_raw=False):
+    indot = str(nx.nx.nx_pydot.to_pydot(G))
+    outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
+    G = nx.nx_pydot.from_pydot(pydot.graph_from_dot_data(outdot)[0])
+    raw_layout = nx.get_node_attributes(G, 'pos')
+    layout = {int(n): tuple(map(float, pos.replace('"', '').split(','))) for n, pos in raw_layout.items()}
+    sorted_layout = dict(sorted(layout.items(), key=lambda pair: pair[0]))
+    if not get_raw:
+        pos = torch.tensor(list(sorted_layout.values()))
+        return Normalization()(pos, data)
+    return sorted_layout
