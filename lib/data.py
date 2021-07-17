@@ -2,7 +2,7 @@ from .imports import *
 from .tools import *
 from .layouts import *
 from .functions import *
-from .normalizations import *
+from .transform import *
 
 
 def load_mtx(file):
@@ -21,7 +21,7 @@ def generate_random_index(data_path='data/rome',
             print(f, file=fout) 
            
             
-@cache()
+@cache
 def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
     if index_file is not None:
         all_files = [f'{data_path}/{f}' for f in open(index_file).read().splitlines() if f.rstrip()]
@@ -44,7 +44,7 @@ def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
     return G_list[0] if type(data_slice) is int else G_list
 
 
-@cache()
+@cache
 def generate_data_list(G, *, 
                        sparse=False, 
                        pivot_mode='random', 
@@ -54,7 +54,8 @@ def generate_data_list(G, *,
                        pmds_list=None,
                        gviz_list=None,
                        noisy_layout=False,
-                       device='cpu'):
+                       device='cpu', 
+                       **kwargs):
     
     def generate_apsp(G):
         n = G.number_of_nodes()
@@ -362,7 +363,8 @@ def generate_data_list(G, *,
                                    pmds_list=None if pmds_list is None else pmds_list[i],
                                    gviz_list=None if gviz_list is None else gviz_list[i],
                                    noisy_layout=noisy_layout,
-                                   device=device)
+                                   device=device, 
+                                   **{k: v[i] for k, v in kwargs.items()})
                 for i, g in enumerate(tqdm(G, desc='preprocess G'))]
     n = G.number_of_nodes()
     m = G.number_of_edges()
@@ -375,7 +377,8 @@ def generate_data_list(G, *,
                 raw_edge_attr=torch.ones(G.number_of_edges()*2, 2).to(device),
                 gt_pos = ground_truth.to(device) if ground_truth is not None else None,
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 
-                full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device))
+                full_edge_attr=torch.tensor(full_eattr, dtype=torch.float, device=device),
+                **{k: torch.tensor(v, dtype=torch.float, device=device) for k, v in kwargs.items()})
     
     if init_mode is not None:
         data.pos = generate_initial_node_attr(G, mode=init_mode)

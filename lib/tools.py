@@ -46,6 +46,10 @@ def cache(cache_arg_key='cache',
                     else cache_hit(cache_file, args, kwargs) if os.path.isfile(cache_file) 
                     else cache_miss(cache_file, args, kwargs))
         return wrapped
+    if callable(cache_arg_key):
+        fn = cache_arg_key
+        cache_arg_key='cache'
+        return decorator(fn)
     return decorator
 
 

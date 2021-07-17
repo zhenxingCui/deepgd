@@ -1,7 +1,7 @@
 from .imports import *
 from .functions import *
 from .modules import *
-from .normalizations import *
+from .transform import *
 from ipynb.fs.defs.losses import *
     
 

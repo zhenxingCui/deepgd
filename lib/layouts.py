@@ -1,5 +1,5 @@
 from .imports import *
-from .normalizations import *
+from .transform import *
 
 def interpolate(layout1, layout2, r):
     return {node: tuple(np.average([layout1[node], layout2[node]], axis=0, weights=(1-r, r))) for node in layout1}

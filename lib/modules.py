@@ -1,6 +1,6 @@
 from .imports import *
 from .functions import *
-from .normalizations import *
+from .transform import *
 
 
 class SoftAdaptController:
