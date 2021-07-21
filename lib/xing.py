@@ -15,9 +15,11 @@ def get_xing(G, pos):
     # convert edge format from tensor to Segment list
     def to_seg_list(tensor):
         return list(map(lambda mat: Segment(Point(*mat[0].tolist()), Point(*mat[1].tolist())), tensor))
+    # find edge positions
     segments = pos[torch.tensor(list(G.edges))]
     # shrink each edge by small epsilon in order to exclude connected edges
     offset_segments = segments * (1 - 1e-5) + segments.flip(dims=(1,)) * 1e-5
+    # compute edge crossings
     intersections = segments_intersections(to_seg_list(offset_segments))
     return intersections
 
