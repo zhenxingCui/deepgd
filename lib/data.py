@@ -515,7 +515,7 @@ class DiscriminatorDataConverter(nn.Module):
         self.complete = complete_graph
         self.normalize = normalize or (lambda p, d: p)
         
-    def forward(data, pos=None, interpolate=0):
+    def forward(self, data, pos=None, interpolate=0):
         dis_data = copy.copy(data)
         if self.complete:
             dis_data.edge_index = dis_data.full_edge_index

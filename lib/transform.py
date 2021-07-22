@@ -50,6 +50,30 @@ class RescaleByDensity(nn.Module):
         if self.return_scale:
             return scaled_pos, scale
         return scaled_pos
+    
+    
+class RescaleByMinMax(nn.Module):
+    def __init__(self, target_scale=1, return_scale=False):
+        super().__init__()
+        self.target_scale = target_scale
+        self.return_scale = return_scale
+        self.center = ZeroCenter(return_center=True)
+        
+    def forward(self, pos, data):
+        batch = make_batch(data)
+        centered_pos, center = self.center(pos, batch)
+        x, y = pos[:, 0], pos[:, 1]
+        xmin = torch_scatter.scatter(x, batch.batch, reduce='min')
+        xmax = torch_scatter.scatter(x, batch.batch, reduce='max')
+        ymin = torch_scatter.scatter(y, batch.batch, reduce='min')
+        ymax = torch_scatter.scatter(y, batch.batch, reduce='max')
+        xrange = xmax - xmin
+        yrange = ymax - ymin
+        scale = torch.maximum(xrange, yrange, dim=0)
+        scaled_pos = self.target_scale * centered_pos / scale[batch.batch][:, None] + center[batch.batch]
+        if self.return_scale:
+            return scaled_pos, scale
+        return scaled_pos
         
         
 class RotateByPCA(nn.Module):
