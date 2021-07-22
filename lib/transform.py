@@ -72,7 +72,7 @@ class RescaleByMinMax(nn.Module):
         ymax = torch_scatter.scatter(y, batch.batch, reduce='max')
         xrange = xmax - xmin
         yrange = ymax - ymin
-        scale = torch.maximum(xrange, yrange, dim=0)
+        scale = torch.maximum(xrange, yrange)
         scaled_pos = self.target_scale * centered_pos / scale[batch.batch][:, None] + center[batch.batch]
         if self.return_scale:
             return scaled_pos, scale
