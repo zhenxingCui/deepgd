@@ -21,15 +21,17 @@ class RescaleByStress(nn.Module):
         super().__init__()
         self.target_scale = target_scale
         self.return_scale = return_scale
+        self.center = ZeroCenter(return_center=True)
         
     def forward(self, pos, data):
         batch = make_batch(data)
+        centered_pos, center = self.center(pos, batch)
         d = batch.full_edge_attr[:, 0]
         start, end = get_full_edges(pos, batch)
         u = (end - start).norm(dim=1)
         index = batch.batch[batch.edge_index[0]]
         scale = torch_scatter.scatter((u/d)**2, index) / torch_scatter.scatter(u/d, index)
-        scaled_pos = self.target_scale * pos / scale[batch.batch][:, None]
+        scaled_pos = self.target_scale * centered_pos / scale[batch.batch][:, None] + center[batch.batch]
         if self.return_scale:
             return scaled_pos, scale
         return scaled_pos
