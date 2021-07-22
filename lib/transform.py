@@ -17,8 +17,9 @@ class ZeroCenter(nn.Module):
     
 
 class RescaleByStress(nn.Module):
-    def __init__(self, return_scale=False):
+    def __init__(self, target_scale=1, return_scale=False):
         super().__init__()
+        self.target_scale = target_scale
         self.return_scale = return_scale
         
     def forward(self, pos, data):
@@ -28,7 +29,7 @@ class RescaleByStress(nn.Module):
         u = (end - start).norm(dim=1)
         index = batch.batch[batch.edge_index[0]]
         scale = torch_scatter.scatter((u/d)**2, index) / torch_scatter.scatter(u/d, index)
-        scaled_pos = pos / scale[batch.batch][:, None]
+        scaled_pos = self.target_scale * pos / scale[batch.batch][:, None]
         if self.return_scale:
             return scaled_pos, scale
         return scaled_pos
