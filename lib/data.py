@@ -513,7 +513,7 @@ class DiscriminatorDataConverter(nn.Module):
     def __init__(self, complete_graph=True, normalize=None):
         super().__init__()
         self.complete = complete_graph
-        self.normalize = normalize or lambda p, d: p
+        self.normalize = normalize or (lambda p, d: p)
         
     def forward(data, pos=None, interpolate=0):
         dis_data = copy.copy(data)
