@@ -509,20 +509,26 @@ def generate_data_list(G, *,
     return data
 
 
-def prepare_discriminator_data(data, pos=None, interpolate=0, complete_graph=True, normalize=Normalization()):
-    dis_data = copy.copy(data)
-    if complete_graph:
-        dis_data.edge_index = dis_data.full_edge_index
-        dis_data.edge_attr = dis_data.full_edge_attr
-    else:
-        dis_data.edge_index = dis_data.raw_edge_index
-    dis_data.pos = normalize(dis_data.gt_pos, dis_data)
-    if pos is not None: 
-        pos = normalize(pos, dis_data)
-        dis_data.pos = interpolate * dis_data.pos + (1 - interpolate) * pos
-        dis_data.pos = normalize(dis_data.pos, dis_data)
-    return dis_data
-
+class DiscriminatorDataConverter(nn.Module):
+    def __init__(self, complete_graph=True, normalize=None):
+        super().__init__()
+        self.complete = complete_graph
+        self.normalize = normalize or lambda p, d: p
+        
+    def forward(data, pos=None, interpolate=0):
+        dis_data = copy.copy(data)
+        if self.complete:
+            dis_data.edge_index = dis_data.full_edge_index
+            dis_data.edge_attr = dis_data.full_edge_attr
+        else:
+            dis_data.edge_index = dis_data.raw_edge_index
+        dis_data.pos = self.normalize(dis_data.gt_pos, dis_data)
+        if pos is not None: 
+            pos = self.normalize(pos, dis_data)
+            dis_data.pos = interpolate * dis_data.pos + (1 - interpolate) * pos
+            dis_data.pos = self.normalize(dis_data.pos, dis_data)
+        return dis_data
+        
 
 class LazyDeviceMappingDataLoader:
     def __init__(self, data_list, batch_size, shuffle, device):
