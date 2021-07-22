@@ -512,7 +512,7 @@ class Generator(nn.Module):
                  euclidian=True,
                  direction=True,
                  residual=True,
-                 normalize=False):
+                 normalize=None):
         super().__init__()
 
         self.in_blocks = nn.ModuleList([
@@ -536,11 +536,12 @@ class Generator(nn.Module):
             GNNBlock(feat_dims=[8 if layer_dims is None else layer_dims[-1], 8], bn=True, static_efeats=2),
             GNNBlock(feat_dims=[8, 2], act=False, static_efeats=2)
         ])
-        self.normalize = Normalization() if normalize else None
+        self.normalize = normalize
 
     def forward(self, data, weights=None, output_hidden=False, numpy=False):
-        v = data.pos if data.pos is not None else generate_rand_pos(len(data.x)).to(data.x.device)       
-        v = self.normalize(v, data)
+        v = data.pos if data.pos is not None else generate_rand_pos(len(data.x)).to(data.x.device)
+        if self.normalize is not None:
+            v = self.normalize(v, data)
         
         hidden = []
         for block in chain(self.in_blocks, 

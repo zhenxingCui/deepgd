@@ -78,10 +78,10 @@ class RotateByPCA(nn.Module):
     
     
 class Normalization(nn.Module):
-    def __init__(self, target_scale=1, target_angle=0):
+    def __init__(self, scale=RescaleByDensity, rotate=RotateByPCA, target_scale=1, target_angle=0):
         super().__init__()
-        self.scale = RescaleByDensity(target_scale=target_scale)
-        self.rotate = RotateByPCA(target_angle=target_angle)
+        self.scale = scale(target_scale=target_scale)
+        self.rotate = rotate(target_angle=target_angle)
         self.center = ZeroCenter()
         
     def forward(self, pos, data):
