@@ -471,7 +471,7 @@ class EdgeNet(nn.Module):
             out_dim = nfeat_dims[0] * nfeat_dims[1]
         except:
             out_dim = nfeat_dims ** 2
-        self.out = nn.Linear(width, out_dim, bias=False)
+        self.out = nn.Linear(width, out_dim)
 
     def forward(self, x):
         return self.out(self.net(x))
