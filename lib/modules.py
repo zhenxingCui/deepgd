@@ -159,32 +159,76 @@ class AdaptiveWeightCompositeLoss(nn.Module):
         if return_components:
             return (result, components)
         return result
+    
+    
+class GCNLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, bn=False, act=False, dp=None, aggr='mean'):
+        super().__init__()
+        self.conv = gnn.GCNConv(in_channels, out_channels, aggr=aggr)
+        self.bn = gnn.BatchNorm(out_channels) if bn else nn.Identity()
+        self.act = nn.LeakyReLU() if act else nn.Identity()
+        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
         
+    def forward(self, x, data):
+        x = self.conv(x, data.edge_index)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.dp(x)
+        return x
+      
+    
+class DenseLayer(nn.Module):
+    def __init__(self, in_dim, out_dim=None, skip=True, bn=True, act=True, dp=None):
+        super().__init__()
+        out_dim = out_dim or in_dim
+        if type(act) is bool:
+            act = nn.LeakyReLU() if act else nn.Identity()
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, out_dim),
+            act,
+            nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
+            nn.Dropout(dp) if dp is not None else nn.Identity(),
+        )
+        self.skip = skip
+        self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
+        
+    def forward(self, x):
+        return self.proj(x) + self.net(x) if self.skip else self.net(x)
+
         
 class GNNLayer(nn.Module):
-    def __init__(self, 
-                 in_vfeat, 
-                 out_vfeat, 
-                 in_efeat, 
+    def __init__(self,
+                 nfeat_dims,
+                 efeat_dim,
+                 aggr,
                  edge_net=None, 
-                 bn=False, 
-                 act=False, 
-                 dp=None, 
-                 aggr='mean',
-                 root_weight=True):
+                 bn=True, 
+                 act=True, 
+                 dp=None,
+                 root_weight=True,
+                 skip=True):
         super().__init__()
-        self.enet = nn.Linear(in_efeat, in_vfeat * out_vfeat) if edge_net is None and in_efeat > 0 else edge_net
-        self.conv = gnn.NNConv(in_vfeat, out_vfeat, nn=self.enet, aggr=aggr, root_weight=root_weight)
-        self.bn = gnn.BatchNorm(out_vfeat) if bn else nn.Identity()
+        try:
+            in_dim = nfeat_dims[0]
+            out_dim = nfeat_dims[1]
+        except:
+            in_dim = nfeat_dims
+            out_dim = nfeat_dims
+        self.enet = nn.Linear(efeat_dim, in_dim * out_dim) if edge_net is None and efeat_dim > 0 else edge_net
+        self.conv = gnn.NNConv(in_dim, out_dim, nn=self.enet, aggr=aggr, root_weight=root_weight)
+        self.bn = gnn.BatchNorm(out_dim) if bn else nn.Identity()
         self.act = nn.LeakyReLU() if act else nn.Identity()
         self.dp = dp and nn.Dropout(dp) or nn.Identity()
+        self.skip = skip
+        self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
         
     def forward(self, v, e, data):
+        v_ = v
         v = self.conv(v, data.edge_index, e)
         v = self.bn(v)
         v = self.act(v)
         v = self.dp(v)
-        return v
+        return v + self.proj(v_) if self.skip else v
 
 
 class GNNBlock(nn.Module):
@@ -239,15 +283,15 @@ class GNNBlock(nn.Module):
                                            efeat_hid_dims + [in_feat * out_feat],
                                            [efeat_hid_act] * len(efeat_hid_dims) + [efeat_out_act])
             ))
-            self.gnn.append(GNNLayer(in_vfeat=in_feat, 
-                                     out_vfeat=out_feat, 
-                                     in_efeat=in_efeat_dim, 
+            self.gnn.append(GNNLayer(nfeat_dims=(in_feat, out_feat), 
+                                     efeat_dim=in_efeat_dim, 
                                      edge_net=edge_net,
                                      bn=bn, 
                                      act=act, 
                                      dp=dp,
                                      aggr=aggr,
-                                     root_weight=root_weight))
+                                     root_weight=root_weight,
+                                     skip=False))
         
     def _get_edge_feat(self, pos, data, rich_efeats=False, euclidian=False, direction=False, weights=None):
         e = data.edge_attr[:, :self.static_efeats]
@@ -351,76 +395,6 @@ class Model(nn.Module):
         
         return hidden if output_hidden else vout
     
-    
-# class GNNBlockForEdgePrediction(nn.Module):
-#     def __init__(self, feat_dims, 
-#                  efeat_hid_dims=[], 
-#                  efeat_hid_acts=nn.LeakyReLU,
-#                  bn=False, 
-#                  act=True, 
-#                  dp=None, 
-#                  n_edge_attr=0,
-#                  extra_efeat='skip',
-#                  euclidian=False, 
-#                  direction=False,
-#                  residual=False):
-#         '''
-#         extra_efeat: {'skip', 'first', 'prev'}
-#         '''
-#         super().__init__()
-        
-#         self.n_edge_attr=n_edge_attr
-#         self.extra_efeat = extra_efeat
-#         self.euclidian = euclidian
-#         self.direction = direction
-#         self.residual = residual
-#         self.gnn = nn.ModuleList()
-#         self.n_layers = len(feat_dims) - 1
-        
-#         for idx, (in_feat, out_feat) in enumerate(zip(feat_dims[:-1], feat_dims[1:])):
-#             direction_dim = feat_dims[idx] if self.extra_efeat == 'prev' else feat_dims[0]
-#             in_efeat_dim = self.n_edge_attr
-#             if self.extra_efeat != 'first': 
-#                 in_efeat_dim += self.euclidian + self.direction * direction_dim
-#             edge_net = nn.Sequential(*chain.from_iterable(
-#                 [nn.Linear(idim, odim),
-#                  nn.BatchNorm1d(odim),
-#                  act()]
-#                 for idim, odim, act in zip([in_efeat_dim] + efeat_hid_dims,
-#                                            efeat_hid_dims + [in_feat * out_feat],
-#                                            [efeat_hid_acts] * len(efeat_hid_dims) + [nn.Tanh])
-#             )) if in_efeat_dim > 0 else None
-#             self.gnn.append(GNNLayer(in_vfeat=in_feat, 
-#                                      out_vfeat=out_feat, 
-#                                      in_efeat=in_efeat_dim, 
-#                                      edge_net=edge_net,
-#                                      bn=bn, 
-#                                      act=act, 
-#                                      dp=dp))
-        
-#     def _get_edge_feat(self, pos, data, euclidian=False, direction=False):
-#         e = torch.zeros(len(data.model_edge_index), 0) if data.model_edge_attr is None else data.model_edge_attr
-#         if euclidian or direction:
-#             start_pos, end_pos = get_full_edges(pos, data)
-#             d, u = l2_normalize(end_pos - start_pos, return_norm=True)
-#             if euclidian:
-#                 e = torch.cat([e, u], dim=1)
-#             if direction:
-#                 e = torch.cat([e, d], dim=1)
-#         return e if e.numel() > 0 else None
-        
-#     def forward(self, v, data):
-#         vres = v
-#         for layer in range(self.n_layers):
-#             vsrc = v if self.euclidian == 'prev' else vres
-#             get_extra = not (self.extra_efeat == 'first' and layer != 0)
-            
-#             e = self._get_edge_feat(vsrc, data, 
-#                                     euclidian=self.euclidian and get_extra, 
-#                                     direction=self.direction and get_extra)
-#             v = self.gnn[layer](v, e, data)
-#         return v + vres if self.residual else v
-    
 
 class GNNGraphDrawing(nn.Module):
     def __init__(self, num_blocks=9, n_weights=0):
@@ -466,40 +440,42 @@ class GNNGraphDrawing(nn.Module):
         return hidden if output_hidden else vout
     
     
-class GCNLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, bn=False, act=False, dp=None, aggr='mean'):
-        super().__init__()
-        self.conv = gnn.GCNConv(in_channels, out_channels, aggr=aggr)
-        self.bn = gnn.BatchNorm(out_channels) if bn else nn.Identity()
-        self.act = nn.LeakyReLU() if act else nn.Identity()
-        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
-        
-    def forward(self, x, data):
-        x = self.conv(x, data.edge_index)
-        x = self.bn(x)
-        x = self.act(x)
-        x = self.dp(x)
-        return x
-        
-        
 class DenseLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, bn=False, act=False, dp=None):
+    def __init__(self, in_dim, out_dim=None, skip=True, bn=True, act=True, dp=None):
         super().__init__()
-        self.dense = nn.Linear(in_channels, out_channels)
-        self.bn = nn.BatchNorm1d(out_channels) if bn else nn.Identity()
+        out_dim = out_dim or in_dim
         if type(act) is bool:
-            self.act = nn.LeakyReLU() if act else nn.Identity()
-        else:
-            self.act = act
-        self.dp = nn.Dropout(dp) if dp is not None else nn.Identity()
+            act = nn.LeakyReLU() if act else nn.Identity()
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, out_dim),
+            act,
+            nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
+            nn.Dropout(dp) if dp is not None else nn.Identity(),
+        )
+        self.project = nn.Identity() if in_dim == out_dim else nn.Linear(in_dim, out_dim, bias=False)
+        self.skip = skip
         
     def forward(self, x):
-        x = self.dense(x)
-        x = self.bn(x)
-        x = self.act(x)
-        x = self.dp(x)
-        return x
+        return self.project(x) + self.net(x) if self.skip else self.net(x)
 
+    
+class EdgeNet(nn.Module):
+    def __init__(self, efeat_dim, nfeat_dims, depth=0, width=None, skip=True, **kwargs):
+        super().__init__()
+        width = width or efeat_dim
+        self.net = nn.Sequential(
+            DenseLayer(efeat_dim, width, skip=skip, **kwargs) if depth > 0 else nn.Identity(),
+            *[DenseLayer(width, skip=skip, **kwargs) for _ in range(depth - 1)]
+        )
+        try:
+            out_dim = nfeat_dims[0] * nfeat_dims[1]
+        except:
+            out_dim = nfeat_dims ** 2
+        self.out = nn.Linear(width, out_dim, bias=False)
+
+    def forward(self, x):
+        return self.out(self.net(x))
+    
     
 class Generator(nn.Module):
     def __init__(self, 
