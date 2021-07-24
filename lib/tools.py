@@ -143,30 +143,3 @@ class StaticConfig:
         return str(self[None])
     
     
-class Hud:
-    def __init__(self, id=None):
-        self.id = id or format(random.randrange(16**8), '08x')
-        self.handle = display(display_id=self.id)
-        self.reset()
-
-    def __setitem__(self, key, value):
-        self.data[key] = value
-        self.refresh()
-    
-    def __call__(self, data={}, index=None, reset=False):
-        if reset:
-            self.reset()
-        self.update(data, index)
-        self.refresh()
-        
-    def reset(self):
-        self.index = ''
-        self.data = {}
-        
-    def update(self, data={}, index=None):
-        if index is not None:
-            self.index = index
-        self.data.update(data)
-        
-    def refresh(self):
-        self.handle.update(pd.DataFrame({key: [self.data[key]] for key in self.data}, index=[self.index]))
