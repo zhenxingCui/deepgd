@@ -1,4 +1,5 @@
-from .imports import *
+from ._dependencies import *
+
 from .functions import *
 from .modules import *
 from .transform import *

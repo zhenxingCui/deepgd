@@ -1,4 +1,5 @@
-from lib.imports import *
+from ._dependencies import *
+
 from lib.tools import *
 from lib.utils import *
 from lib.modules import *

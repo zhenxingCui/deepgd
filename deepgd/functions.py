@@ -1,4 +1,4 @@
-from .imports import *
+from ._dependencies import *
 
 
 def generate_rand_pos(n, seed=None):

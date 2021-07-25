@@ -1,5 +1,4 @@
 import os
-import os.path
 import re
 import time
 import glob
@@ -16,10 +15,6 @@ from itertools import chain, combinations
 from functools import reduce, lru_cache
 from abc import ABC, abstractmethod
 
-import pynvml
-from tqdm.notebook import tqdm
-
-import pydot
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -31,6 +26,9 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 import forceatlas2 as fa2
+import pydot
+import pynvml
+from tqdm.notebook import tqdm
 
 import torch
 import torch.nn as nn

@@ -14,4 +14,4 @@ class ColabInfo:
 
     def file_id(self, full_path=False):
         id = self._get_info()['path'].split("=")[1]
-        return f"colab.research.google.com/drive/{id}" if full_path else id
+        return f"https://colab.research.google.com/drive/{id}" if full_path else id
