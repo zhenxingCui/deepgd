@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 from IPython.display import Javascript
 
