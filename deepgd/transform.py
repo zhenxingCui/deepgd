@@ -86,7 +86,7 @@ class Standardization(nn.Module):
         self.scale_factor = scale_factor
         self.return_normalizer = return_normalizer
     
-     def forward(self, pos, data):
+    def forward(self, pos, data):
         batch = make_batch(data)
         center = torch_scatter.scatter(pos, batch.batch, dim=0, reduce='mean')
         centered_pos = pos - center[batch.batch]
@@ -142,10 +142,10 @@ class Canonicalization(nn.Module):
                  normalize=Standardization(), 
                  scale=ScaleByGraphOrder()):
         super().__init__()
-        self.translate = translate
-        self.rotate = rotate
-        self.normalize = normalize
-        self.scale = scale
+        self.translate = translate or IdentityTransformation()
+        self.rotate = rotate or IdentityTransformation()
+        self.normalize = normalize or IdentityTransformation()
+        self.scale = scale or IdentityTransformation()
         
     def forward(self, pos, data):
         batch = make_batch(data)
@@ -159,8 +159,7 @@ class Canonicalization(nn.Module):
 class CanonicalizationByStress(nn.Module):
     def __init__(self):
         super().__init__()
-        self.canonicalize = Canonicalization(normalize=IdentityTransformation,
-                                             scale=RescaleByStress)
+        self.canonicalize = Canonicalization(normalize=None, scale=RescaleByStress())
         
     def forward(self, pos, data):
         batch = make_batch(data)
