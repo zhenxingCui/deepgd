@@ -36,6 +36,29 @@ class ZeroCenter(nn.Module):
             return centered_pos, center
         return centered_pos
     
+        
+class RotateByPrincipalComponents(nn.Module):
+    def __init__(self, base_angle=0, return_components=False):
+        super().__init__()
+        sin = np.sin(base_angle)
+        cos = np.cos(base_angle)
+        self.base_rotation = torch.tensor([[-sin, cos],
+                                           [ cos, sin]]).float()
+        self.return_components = return_components
+        
+    def forward(self, pos, data):
+        batch = make_batch(data)
+        XXT = torch.einsum('ni,nj->nij', pos, pos)
+        cov = torch_scatter.scatter(XXT, batch.batch, dim=0, reduce='mean')
+        components = torch.linalg.eigh(cov).eigenvectors
+        rotated_pos = torch.einsum('ij,njk,nk->ni', 
+                                   self.base_rotation.to(pos.device),
+                                   components[batch.batch], 
+                                   pos)
+        if self.return_components:
+            return rotated_pos, components
+        return rotated_pos
+
 
 class RescaleByStress(nn.Module):
     def __init__(self, scale_factor=1, return_scale=False):
@@ -54,9 +77,49 @@ class RescaleByStress(nn.Module):
         if self.return_scale:
             return scaled_pos, scale
         return scaled_pos
-    
 
-class RescaleByDensity(nn.Module):
+    
+class Standardization(nn.Module):
+    def __init__(self, norm_ord=2, scale_factor=1, return_normalizer=False):
+        super().__init__()
+        self.norm_ord = norm_ord
+        self.scale_factor = scale_factor
+        self.return_normalizer = return_normalizer
+    
+     def forward(self, pos, data):
+        batch = make_batch(data)
+        center = torch_scatter.scatter(pos, batch.batch, dim=0, reduce='mean')
+        centered_pos = pos - center[batch.batch]
+        square = centered_pos.square()
+        var = torch_scatter.scatter(square, batch.batch, dim=0, reduce='mean')
+        std = var.sqrt()
+        normalizer = torch.linalg.norm(std, ord=self.norm_ord, dim=1)
+        scaled_pos = self.scale_factor * pos / normalizer[batch.batch][:, None]
+        if self.return_normalizer:
+            return scaled_pos, normalizer
+        return scaled_pos
+    
+    
+class Normalization(nn.Module):
+    def __init__(self, norm_ord=2, scale_factor=1, return_normalizer=False):
+        super().__init__()
+        self.norm_ord = norm_ord
+        self.scale_factor = scale_factor
+        self.return_normalizer = return_normalizer
+        
+    def forward(self, pos, data):
+        batch = make_batch(data)
+        min = torch_scatter.scatter(pos, batch.batch, dim=0, reduce='min')
+        max = torch_scatter.scatter(pos, batch.batch, dim=0, reduce='max')
+        range = max - min
+        normalizer = torch.linalg.norm(range, ord=self.norm_ord, dim=1)
+        scaled_pos = self.scale_factor * pos / normalizer[batch.batch][:, None]
+        if self.return_normalizer:
+            return scaled_pos, normalizer
+        return scaled_pos
+           
+
+class ScaleByGraphOrder(nn.Module):
     def __init__(self, scale_factor=1, return_scale=False):
         super().__init__()
         self.scale_factor = scale_factor
@@ -64,82 +127,43 @@ class RescaleByDensity(nn.Module):
         
     def forward(self, pos, data):
         batch = make_batch(data)
-        radius = torch.linalg.norm(pos, dim=1)
-        scale =  torch_scatter.scatter(radius, batch.batch, reduce='mean') / torch.sqrt(batch.n)
+        d = pos.shape[-1]
+        scale = batch.n ** (1/d)
         scaled_pos = self.scale_factor * pos / scale[batch.batch][:, None]
         if self.return_scale:
             return scaled_pos, scale
         return scaled_pos
     
-    
-class RescaleByMinMax(nn.Module):
-    def __init__(self, scale_factor=1, return_scale=False):
+        
+class Canonicalization(nn.Module):
+    def __init__(self, 
+                 translate=ZeroCenter(), 
+                 rotate=RotateByPrincipalComponents(),
+                 normalize=Standardization(), 
+                 scale=ScaleByGraphOrder()):
         super().__init__()
-        self.scale_factor = scale_factor
-        self.return_scale = return_scale
+        self.translate = translate
+        self.rotate = rotate
+        self.normalize = normalize
+        self.scale = scale
         
     def forward(self, pos, data):
         batch = make_batch(data)
-        x, y = pos[:, 0], pos[:, 1]
-        xmin = torch_scatter.scatter(x, batch.batch, reduce='min')
-        xmax = torch_scatter.scatter(x, batch.batch, reduce='max')
-        ymin = torch_scatter.scatter(y, batch.batch, reduce='min')
-        ymax = torch_scatter.scatter(y, batch.batch, reduce='max')
-        xrange = xmax - xmin
-        yrange = ymax - ymin
-        scale = torch.maximum(xrange, yrange)
-        scaled_pos = self.scale_factor * pos / scale[batch.batch][:, None]
-        if self.return_scale:
-            return scaled_pos, scale
-        return scaled_pos
-        
-        
-class RotateByPCA(nn.Module):
-    def __init__(self, base_angle=0, return_rotation=False):
-        super().__init__()
-        sin = np.sin(base_angle)
-        cos = np.cos(base_angle)
-        self.base_rotation = torch.tensor([[-sin, cos],
-                                           [ cos, sin]]).float()
-        self.return_rotation = return_rotation
-        
-    def forward(self, pos, data):
-        batch = make_batch(data)
-        XXT = torch.einsum('ni,nj->nij', pos, pos)
-        cov = torch_scatter.scatter(XXT, batch.batch, dim=0, reduce='mean')
-        rotation = torch.linalg.eigh(cov).eigenvectors
-        rotated_pos = torch.einsum('ij,njk,nk->ni', 
-                                   self.base_rotation.to(pos.device),
-                                   rotation[batch.batch], 
-                                   pos)
-        if self.return_rotation:
-            return rotated_pos, rotation
-        return rotated_pos
-
-
-class CanonicalNormalization(nn.Module):
-    def __init__(self, center=ZeroCenter, rotate=RotateByPCA, scale=RescaleByDensity, base_angle=0, scale_factor=1):
-        super().__init__()
-        self.center = center()
-        self.rotate = rotate(base_angle=base_angle)
-        self.scale = scale(scale_factor=scale_factor)
-        
-    def forward(self, pos, data):
-        batch = make_batch(data)
-        pos = self.center(pos, batch)
+        pos = self.translate(pos, batch)
         pos = self.rotate(pos, batch)
+        pos = self.normalize(pos, batch)
         pos = self.scale(pos, batch)
         return pos
     
     
-class CenteredStressMajorization(nn.Module):
+class CanonicalizationByStress(nn.Module):
     def __init__(self):
         super().__init__()
-        self.normalize = CanonicalNormalization(rotate=IdentityTransformation,
-                                                scale=RescaleByStress)
+        self.canonicalize = Canonicalization(normalize=IdentityTransformation,
+                                             scale=RescaleByStress)
         
     def forward(self, pos, data):
         batch = make_batch(data)
-        pos = self.normalize(pos, batch)
+        pos = self.canonicalize(pos, batch)
         return pos
     
