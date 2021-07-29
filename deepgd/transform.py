@@ -129,7 +129,7 @@ class ScaleByGraphOrder(nn.Module):
         batch = make_batch(data)
         d = pos.shape[-1]
         scale = batch.n ** (1/d)
-        scaled_pos = self.scale_factor * pos / scale[batch.batch][:, None]
+        scaled_pos = self.scale_factor * pos * scale[batch.batch][:, None]
         if self.return_scale:
             return scaled_pos, scale
         return scaled_pos
@@ -156,13 +156,7 @@ class Canonicalization(nn.Module):
         return pos
     
     
-class CanonicalizationByStress(nn.Module):
+class CanonicalizationByStress(Canonicalization):
     def __init__(self):
-        super().__init__()
-        self.canonicalize = Canonicalization(normalize=None, scale=RescaleByStress())
-        
-    def forward(self, pos, data):
-        batch = make_batch(data)
-        pos = self.canonicalize(pos, batch)
-        return pos
-    
+        super().__init__(normalize=None, 
+                         scale=RescaleByStress())

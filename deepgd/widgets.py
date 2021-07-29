@@ -1,72 +1,64 @@
 import random
 import pandas as pd
+from abc import ABC, abstractmethod
 from IPython.display import Javascript
 
 
-class Widgets:
-    def __init__(self, id=None):
+class Widget:
+    def __init__(self, id=None, data=None, title=None):
         self.id = id or format(random.randrange(16**8), '08x')
         self.handle = display(display_id=self.id)
-        
-    
-class Hud(Widgets):
-    def __init__(self, id=None):
-        super().__init__(id=id)
         self.reset()
-
+        self(data=data, title=title)
+        
     def __setitem__(self, key, value):
         self.data[key] = value
         self.refresh()
-    
-    def __call__(self, data={}, index=None, reset=False):
-        if reset:
-            self.reset()
-        self.update(data, index)
+        
+    def __call__(self, data=None, title=None):
+        if data is not None:
+            self.data = data
+        if title is not None:
+            self.title = title
         self.refresh()
+        return self
         
     def reset(self):
-        self.index = ''
         self.data = {}
-        
-    def update(self, data={}, index=None):
-        if index is not None:
-            self.index = index
-        self.data.update(data)
+        self.title = ""
+        self.refresh()
+        return self
         
     def refresh(self):
-        self.handle.update(pd.DataFrame({key: [self.data[key]] for key in self.data}, index=[self.index]))
+        self.handle.update(repr(self))
+        return self
         
-        
-class CopyButton(Widgets):
-    def __init__(self, id=None):
-        super().__init__(id=id)
-        self.reset()
-        
-    def __setitem__(self, key, value):
-        if key is None:
-            self.data.append(value)
-        else:
-            self.data[key] = value
-        self.refresh()
-        
-    def __call__(self, data=[], label=None, reset=False):
-        if reset:
-            self.reset()
-        self.update(data, label)
-        self.refresh()
     
-    def reset(self):
-        self.label = ''
-        self.data = []
+class Hud(Widget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def append(self, data={}, title=None):
+        self.data.update(data)
+        self(title=title)
+        return self
         
-    def update(self, data=[], label=None):
-        if label is not None:
-            self.label = label
-        self.data = data
+    def __repr__(self):
+        return pd.DataFrame({key: [self.data[key]] for key in self.data}, index=[self.title])
         
-    def refresh(self):
+        
+class CopyButton(Widget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def append(self, data=[], title=None):
+        self.data += data
+        self(title=title)
+        return self
+        
+    def __repr__(self):
         sep = r'\t'
-        self.handle.update(Javascript(f'''
+        return Javascript(f'''
             (async() => {{
                 const button = document.createElement('button');
                 try {{
@@ -80,4 +72,4 @@ class CopyButton(Widgets):
                     }});
                 }} finally {{ }}
             }})();
-        '''))
+        ''')
