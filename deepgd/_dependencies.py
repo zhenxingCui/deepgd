@@ -29,6 +29,7 @@ import forceatlas2 as fa2
 import pydot
 import pynvml
 from tqdm.notebook import tqdm
+from ipywidgets import Tab, Output, HBox, VBox, Layout
 
 import torch
 import torch.nn as nn

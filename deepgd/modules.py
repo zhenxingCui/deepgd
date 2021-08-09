@@ -177,25 +177,6 @@ class GCNLayer(nn.Module):
         x = self.dp(x)
         return x
       
-    
-class DenseLayer(nn.Module):
-    def __init__(self, in_dim, out_dim=None, skip=True, bn=True, act=True, dp=None):
-        super().__init__()
-        out_dim = out_dim or in_dim
-        if type(act) is bool:
-            act = nn.LeakyReLU() if act else nn.Identity()
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, out_dim),
-            act,
-            nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
-            nn.Dropout(dp) if dp is not None else nn.Identity(),
-        )
-        self.skip = skip
-        self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
-        
-    def forward(self, x):
-        return self.proj(x) + self.net(x) if self.skip else self.net(x)
-
         
 class GNNLayer(nn.Module):
     def __init__(self,
@@ -203,6 +184,7 @@ class GNNLayer(nn.Module):
                  efeat_dim,
                  aggr,
                  edge_net=None, 
+                 dense=False,
                  bn=True, 
                  act=True, 
                  dp=None,
@@ -217,6 +199,7 @@ class GNNLayer(nn.Module):
             out_dim = nfeat_dims
         self.enet = nn.Linear(efeat_dim, in_dim * out_dim) if edge_net is None and efeat_dim > 0 else edge_net
         self.conv = gnn.NNConv(in_dim, out_dim, nn=self.enet, aggr=aggr, root_weight=root_weight)
+        self.dense = nn.Linear(out_dim, out_dim) if dense else nn.Identity()
         self.bn = gnn.BatchNorm(out_dim) if bn else nn.Identity()
         self.act = nn.LeakyReLU() if act else nn.Identity()
         self.dp = dp and nn.Dropout(dp) or nn.Identity()
@@ -226,6 +209,7 @@ class GNNLayer(nn.Module):
     def forward(self, v, e, data):
         v_ = v
         v = self.conv(v, data.edge_index, e)
+        v = self.dense(v)
         v = self.bn(v)
         v = self.act(v)
         v = self.dp(v)
@@ -449,15 +433,15 @@ class DenseLayer(nn.Module):
             act = nn.LeakyReLU() if act else nn.Identity()
         self.net = nn.Sequential(
             nn.Linear(in_dim, out_dim),
-            act,
             nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
+            act,
             nn.Dropout(dp) if dp is not None else nn.Identity(),
         )
-        self.project = nn.Identity() if in_dim == out_dim else nn.Linear(in_dim, out_dim, bias=False)
         self.skip = skip
+        self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
         
     def forward(self, x):
-        return self.project(x) + self.net(x) if self.skip else self.net(x)
+        return self.proj(x) + self.net(x) if self.skip else self.net(x)
 
     
 class EdgeNet(nn.Module):

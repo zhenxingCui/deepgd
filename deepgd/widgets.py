@@ -1,13 +1,23 @@
 import random
 import pandas as pd
 from abc import ABC, abstractmethod
-from IPython.display import Javascript
+from IPython.display import display, Javascript
+from ipywidgets import Output
 
 
-class Widget:
-    def __init__(self, id=None, data=None, title=None):
-        self.id = id or format(random.randrange(16**8), '08x')
-        self.handle = display(display_id=self.id)
+class Wrapper(Output):
+    def __init__(self, fn, *args, **kwargs):
+        super().__init__()
+        with self:
+            self.obj = fn(*args, **kwargs)
+
+    def __call__(self):
+        return self.obj
+
+
+class Widget(Output):
+    def __init__(self, data=None, title=None):
+        super().__init__()
         self.reset()
         self(data=data, title=title)
         
@@ -28,9 +38,11 @@ class Widget:
         self.title = ""
         self.refresh()
         return self
-        
+    
     def refresh(self):
-        self.handle.update(repr(self))
+        with self:
+            self.clear_output(wait=True)
+            display(self._get_repr_())
         return self
         
     
@@ -43,7 +55,7 @@ class Hud(Widget):
         self(title=title)
         return self
         
-    def __repr__(self):
+    def _get_repr_(self):
         return pd.DataFrame({key: [self.data[key]] for key in self.data}, index=[self.title])
         
         
@@ -56,7 +68,7 @@ class CopyButton(Widget):
         self(title=title)
         return self
         
-    def __repr__(self):
+    def _get_repr_(self):
         sep = r'\t'
         return Javascript(f'''
             (async() => {{
