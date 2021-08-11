@@ -162,6 +162,23 @@ class AdaptiveWeightCompositeLoss(nn.Module):
         return result
     
     
+class AdaptiveWeightSquareError(nn.Module):
+    def __init__(self, importance=None):
+        super().__init__()
+        self.importance = 1 if importance is None else np.array(importance)
+        self.mse = nn.MSELoss(reduction='none')
+        
+    def __len__(self):
+        return len(self.importance)
+        
+    def forward(self, pred, gt):
+        error = self.mse(pred, gt)
+        mean_err = error.mean(dim=0)
+        weight = self.importance / mean_err.detach()
+        weight /= weight.sum()
+        return (mean_err * weight).sum()
+    
+    
 class GCNLayer(nn.Module):
     def __init__(self, in_channels, out_channels, bn=False, act=False, dp=None, aggr='mean'):
         super().__init__()
@@ -426,21 +443,33 @@ class GNNGraphDrawing(nn.Module):
     
     
 class DenseLayer(nn.Module):
-    def __init__(self, in_dim, out_dim=None, skip=True, bn=True, act=True, dp=None):
+    def __init__(self, in_dim, out_dim=None, skip=True, bn=True, act=True, dp=None, _flip=False):
         super().__init__()
         out_dim = out_dim or in_dim
         if type(act) is bool:
             act = nn.LeakyReLU() if act else nn.Identity()
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, out_dim),
-            nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
-            act,
-            nn.Dropout(dp) if dp is not None else nn.Identity(),
-        )
+        self._flip = _flip
+        if self._flip:
+            self.net = nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+                act,
+                nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
+                nn.Dropout(dp) if dp is not None else nn.Identity(),
+            )
+            self.project = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
+        else:
+            self.net = nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+                nn.BatchNorm1d(out_dim) if bn else nn.Identity(),
+                act,
+                nn.Dropout(dp) if dp is not None else nn.Identity(),
+            )
+            self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
         self.skip = skip
-        self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
         
     def forward(self, x):
+        if self._flip:
+            return self.project(x) + self.net(x) if self.skip else self.net(x)
         return self.proj(x) + self.net(x) if self.skip else self.net(x)
 
     
@@ -517,3 +546,4 @@ class Generator(nn.Module):
                 vout = self.normalize(vout, data)
         
         return hidden if output_hidden else vout
+
