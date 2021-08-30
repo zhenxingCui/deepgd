@@ -283,7 +283,7 @@ class SeparableNNConvLayer(nn.Module):
         except:
             i_dim = n_dims
             o_dim = n_dims
-        h_dim = i_dim * expansion
+        h_dim = o_dim * expansion
         return i_dim, h_dim, o_dim
         
     def forward(self, v, e, data):
