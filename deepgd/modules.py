@@ -260,7 +260,7 @@ class SeparableNNConvLayer(nn.Module):
         in_dim, hid_dim, out_dim = self._get_dims(nfeat_dims, expansion)
         raw_enet = nn.Linear(efeat_dim, hid_dim) if edge_net is None and efeat_dim > 0 else edge_net
         
-        self.theta = nn.Parameter(torch.zeros(hid_dim)[None, :], require_grad=root_weight)
+        self.theta = nn.Parameter(torch.zeros(hid_dim)[None, :]) if root_weight else 0
         self.enet = self.ENetWrapper(raw_enet)
         self.act = act
         
