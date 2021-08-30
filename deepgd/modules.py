@@ -231,6 +231,77 @@ class GNNLayer(nn.Module):
         v = self.act(v)
         v = self.dp(v)
         return v + self.proj(v_) if self.skip else v
+    
+
+class SeparableNNConvLayer(nn.Module):
+    
+    class ENetWrapper(nn.Module):
+        def __init__(self, enet):
+            super().__init__()
+            self.enet = enet
+            
+        def forward(self, x):
+            return torch.diag_embed(self.enet(x)).flatten(start_dim=1)
+            
+    def __init__(self,
+                 nfeat_dims,
+                 efeat_dim,
+                 aggr,
+                 expansion=1,
+                 edge_net=None, 
+                 bn=True, 
+                 act=nn.LeakyReLU(), 
+                 dp=0,
+                 root_weight=True,
+                 skip=True):
+        super().__init__()
+        in_dim, hid_dim, out_dim = self._get_dims(nfeat_dims, expansion)
+        raw_enet = nn.Linear(efeat_dim, hid_dim) if edge_net is None and efeat_dim > 0 else edge_net
+        
+        self.theta = nn.Parameter(torch.zeros(hid_dim)[None, :], require_grad=root_weight)
+        self.enet = self.ENetWrapper(raw_enet)
+        self.act = act
+        
+        self.ipconv = nn.Linear(in_dim, hid_dim)
+        self.ibn = gnn.BatchNorm(in_dim) if bn else nn.Identity()
+        
+        self.dconv = gnn.NNConv(hid_dim, hid_dim, nn=self.enet, aggr=aggr, root_weight=False)
+        self.hbn = gnn.BatchNorm(hid_dim) if bn else nn.Identity()
+        
+        self.opconv = nn.Linear(hid_dim, out_dim)
+        self.obn = gnn.BatchNorm(out_dim) if bn else nn.Identity()
+        
+        self.proj = None if not skip else nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
+        self.dp = dp and nn.Dropout(dp) or nn.Identity()
+
+    def _get_dims(self, n_dims, expansion):
+        try:
+            i_dim = n_dims[0]
+            o_dim = n_dims[1]
+        except:
+            i_dim = n_dims
+            o_dim = n_dims
+        h_dim = i_dim * expansion
+        return i_dim, h_dim, o_dim
+        
+    def forward(self, v, e, data):
+        v_ = v
+        
+        v = self.ipconv(v)
+        v = self.ibn(v)
+        v = self.act(v)
+        
+        v = v * self.theta + self.dconv(v, data.edge_index, e)
+        v = self.hbn(v)
+        v = self.act(v)
+        
+        v = self.opconv(v)
+        v = self.obn(v)
+        
+        if self.proj is not None:
+            v += self.proj(v_)
+            
+        return self.dp(v)
 
 
 class GNNBlock(nn.Module):

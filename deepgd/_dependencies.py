@@ -11,6 +11,8 @@ import pathlib
 import warnings
 import concurrent
 import subprocess
+from dataclasses import dataclass
+from typing import Optional, List, Union
 from itertools import chain, combinations
 from functools import reduce, lru_cache
 from abc import ABC, abstractmethod
