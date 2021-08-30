@@ -163,9 +163,10 @@ class AdaptiveWeightCompositeLoss(nn.Module):
     
     
 class AdaptiveWeightSquareError(nn.Module):
-    def __init__(self, importance=None):
+    def __init__(self, importance=None, normalize=True):
         super().__init__()
-        self.importance = 1 if importance is None else np.array(importance)
+        self.importance = 1 if importance is None else torch.tensor(importance)
+        self.normalize = normalize
         self.mse = nn.MSELoss(reduction='none')
         
     def __len__(self):
@@ -174,8 +175,9 @@ class AdaptiveWeightSquareError(nn.Module):
     def forward(self, pred, gt):
         error = self.mse(pred, gt)
         mean_err = error.mean(dim=0)
-        weight = self.importance / mean_err.detach()
-        weight /= weight.sum()
+        weight = self.importance.to(pred.device) / mean_err.detach()
+        if self.normalize:
+            weight /= weight.sum()
         return (mean_err * weight).sum()
     
     
