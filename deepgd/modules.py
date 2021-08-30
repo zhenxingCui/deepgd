@@ -564,6 +564,20 @@ class EdgeNet(nn.Module):
         return self.out(self.net(x))
     
     
+class DepthWiseEdgeNet(nn.Module):
+    def __init__(self, efeat_dim, nfeat_dim, depth=0, width=None, skip=True, **kwargs):
+        super().__init__()
+        width = width or efeat_dim
+        self.net = nn.Sequential(
+            DenseLayer(efeat_dim, width, skip=skip, **kwargs) if depth > 0 else nn.Identity(),
+            *[DenseLayer(width, skip=skip, **kwargs) for _ in range(depth - 1)]
+        )
+        self.out = nn.Linear(width if depth > 0 else efeat_dim, nfeat_dim)
+
+    def forward(self, x):
+        return self.out(self.net(x))
+    
+    
 class Generator(nn.Module):
     def __init__(self, 
                  num_blocks=9, 
