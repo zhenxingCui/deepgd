@@ -20,7 +20,7 @@ def bentley_ottmann_xing(G, pos):
     return list(set(intersections.keys()))
 
 
-def get_num_xing(batch, pos, eps=1e-5, return_xing=False):
+def get_num_xing(pos, batch, eps=1e-5, return_xing=False):
     def x(v, u):
         return torch.cross(
             F.pad(v, (0, 1)),
@@ -74,7 +74,7 @@ def get_num_xing(batch, pos, eps=1e-5, return_xing=False):
     )
 
     batch_idx = batch.batch[s1]
-    n_xing = torch_scatter.scatter(xing.long(), batch_idx)
+    n_xing = torch_scatter.scatter(xing.float(), batch_idx)
     
     return xing if return_xing else n_xing
 

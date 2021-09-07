@@ -7,6 +7,7 @@ from .utils import *
 from .modules import *
 from .widgets import * 
 from .colab import *
+from .xing import *
 from .functions import *
 from .transform import *
 from ipynb.fs.defs.losses import *
