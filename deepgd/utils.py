@@ -288,7 +288,7 @@ def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None,
     }
     
     
-def graph_vis(G, node_pos, file_name=None, **kwargs):
+def graph_vis(G, pos, highlight_edge=None, file_name=None, **kwargs):
     G = nx.Graph(G)
     graph_attr = dict(node_size=100, 
                       with_labels=False, 
@@ -297,7 +297,14 @@ def graph_vis(G, node_pos, file_name=None, **kwargs):
                       font_weight="bold",
                       font_size=12)
     graph_attr.update(kwargs)
-    for i, (n, p) in enumerate(node_pos):
+    if highlight_edge is not None:
+        edges = list(G.edges)
+        attrs = {edges[e]: {'c': 'r', 'w': 2} for e in np.unique(highlight_edge)}
+        nx.set_edge_attributes(G, attrs)
+        colors = [G[u][v]['c'] if 'c' in G[u][v] else 'black' for u,v in edges]
+        weights = [G[u][v]['w'] if 'w' in G[u][v] else 1 for u,v in edges]
+        graph_attr.update(dict(edge_color=colors, width=weights))
+    for i, (n, p) in enumerate(pos):
         G.nodes[i]['pos'] = n, p
     pos = nx.get_node_attributes(G, name='pos')
     if file_name is not None:

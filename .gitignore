@@ -10,3 +10,4 @@ ckpts/
 graphviz_baseline/
 .envrc
 .lab
+.virtual_documents/

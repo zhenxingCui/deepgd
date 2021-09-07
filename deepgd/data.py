@@ -276,6 +276,12 @@ def generate_data_list(G, *,
         reverse_edges = set(map(lambda x: x[::-1], no_self_loop))
         sorted_symmetric_edges = sorted(list(no_self_loop.union(reverse_edges)))
         return torch.tensor(sorted_symmetric_edges, dtype=torch.long, device=device).t()
+
+    def create_edge_pair_index(*edge_sets, device='cpu'):
+        all_edges = reduce(lambda x, y: x.union(y), edge_sets, set())
+        no_self_loop = {tuple(sorted(edge)) for edge in all_edges if edge[0] != edge[1]}
+        edge_pairs = [(s1, e1, s2, e2) for (s1, e1), (s2, e2) in combinations(no_self_loop, 2)]
+        return torch.tensor(edge_pairs, dtype=torch.long, device=device).t()
     
     def generate_regular_edge_attr(G, elist, apsp):
         edge_attr = []
@@ -375,6 +381,7 @@ def generate_data_list(G, *,
     ground_truth = generate_initial_node_attr(G, mode='gviz')
     data = Data(x=torch.zeros(n, device=device), n=n, m=m,
                 raw_edge_index=create_edge_index(G.edges),
+                edge_pair_index=create_edge_pair_index(G.edges),
                 raw_edge_attr=torch.ones(G.number_of_edges()*2, 2).to(device),
                 gt_pos = ground_truth.to(device) if ground_truth is not None else None,
                 full_edge_index=torch.tensor(full_elist, dtype=torch.long, device=device).t(), 

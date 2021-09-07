@@ -13,7 +13,7 @@ import concurrent
 import subprocess
 from dataclasses import dataclass
 from typing import Optional, List, Union
-from itertools import chain, combinations
+from itertools import chain, combinations, product
 from functools import reduce, lru_cache
 from abc import ABC, abstractmethod
 

@@ -165,7 +165,7 @@ class AdaptiveWeightCompositeLoss(nn.Module):
 class AdaptiveWeightSquareError(nn.Module):
     def __init__(self, importance=None, normalize=True):
         super().__init__()
-        self.importance = 1 if importance is None else torch.tensor(importance)
+        self.importance = torch.tensor(1) if importance is None else torch.tensor(importance)
         self.normalize = normalize
         self.mse = nn.MSELoss(reduction='none')
         
@@ -265,7 +265,7 @@ class SeparableNNConvLayer(nn.Module):
         self.act = act
         
         self.ipconv = nn.Linear(in_dim, hid_dim)
-        self.ibn = gnn.BatchNorm(in_dim) if bn else nn.Identity()
+        self.ibn = gnn.BatchNorm(hid_dim) if bn else nn.Identity()
         
         self.dconv = gnn.NNConv(hid_dim, hid_dim, nn=self.enet, aggr=aggr, root_weight=False)
         self.hbn = gnn.BatchNorm(hid_dim) if bn else nn.Identity()
