@@ -1,23 +1,23 @@
 from .._dependencies import *
 
-import ground
-from .bentley_ottmann import segments_intersections
-Multipoint = ground.base.get_context().multipoint_cls
-Point = ground.base.get_context().point_cls
-Segment = ground.base.get_context().segment_cls
+# import ground
+# from .bentley_ottmann import segments_intersections
+# Multipoint = ground.base.get_context().multipoint_cls
+# Point = ground.base.get_context().point_cls
+# Segment = ground.base.get_context().segment_cls
 
 
-def bentley_ottmann_xing(G, pos):
-    # convert edge format from tensor to Segment list
-    def to_seg_list(tensor):
-        return list(map(lambda mat: Segment(Point(*mat[0].tolist()), Point(*mat[1].tolist())), tensor))
-    # find edge positions
-    segments = pos[torch.tensor(list(G.edges))]
-    # shrink each edge by small epsilon in order to exclude connected edges
-    offset_segments = segments * (1 - 1e-5) + segments.flip(dims=(1,)) * 1e-5
-    # compute edge crossings
-    intersections = segments_intersections(to_seg_list(offset_segments))
-    return list(set(intersections.keys()))
+# def bentley_ottmann_xing(G, pos):
+#     # convert edge format from tensor to Segment list
+#     def to_seg_list(tensor):
+#         return list(map(lambda mat: Segment(Point(*mat[0].tolist()), Point(*mat[1].tolist())), tensor))
+#     # find edge positions
+#     segments = pos[torch.tensor(list(G.edges))]
+#     # shrink each edge by small epsilon in order to exclude connected edges
+#     offset_segments = segments * (1 - 1e-5) + segments.flip(dims=(1,)) * 1e-5
+#     # compute edge crossings
+#     intersections = segments_intersections(to_seg_list(offset_segments))
+#     return list(set(intersections.keys()))
 
 
 def get_num_xing(pos, batch, eps=1e-5, return_xing=False):
