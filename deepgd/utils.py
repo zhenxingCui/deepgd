@@ -134,6 +134,8 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
 
         stress.append(metrics['stress'])
         stress_spc.append(metrics['stress_spc'])
+        xing.append(metrics['xing'])
+        xing_spc.append(metrics['xing_spc'])
         l1_angle.append(metrics['l1_angle'])
         l1_angle_spc.append(metrics['l1_angle_spc'])
         edge.append(metrics['edge'])
@@ -151,6 +153,8 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
     return {
         "stress": torch.tensor(stress),
         "stress_spc": torch.tensor(stress_spc),
+        "xing": torch.tensor(xing),
+        "xing_spc": torch.tensor(xing_spc),
         "l1_angle": torch.tensor(l1_angle),
         "l1_angle_spc": torch.tensor(l1_angle_spc),
         "edge": torch.tensor(edge),
@@ -215,7 +219,7 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
 #             gt_stress = stress_criterion(gt, data)
         
         gt_stress = load_ground_truth(idx, 'stress', gt_file)
-        
+        gt_xing = load_ground_truth(idx, 'xing', gt_file)
         gt_l1_angle = load_ground_truth(idx, 'l1_angle', gt_file)
         gt_edge = load_ground_truth(idx, 'edge', gt_file)
         gt_ring = load_ground_truth(idx, 'ring', gt_file)
@@ -234,16 +238,18 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
             pred = RescaleByStress()(raw_pred, data)
         
         stress = stress_criterion(pred, data)
+        xing = xing_criterion(pred, data)
         l1_angle = l1_angle_criterion(pred, data)
         edge = edge_criterion(pred, data)
         ring = ring_criterion(pred, data)
         tsne = tsne_criterion(pred, data)
         
-        stress_spc = (stress - gt_stress) / np.maximum(gt_stress, stress.cpu().numpy())
-        l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(gt_l1_angle, l1_angle.cpu().numpy())
-        edge_spc = (edge - gt_edge) / np.maximum(gt_edge, edge.cpu().numpy())
-        ring_spc = (ring - gt_ring) / np.maximum(gt_ring, ring.cpu().numpy())
-        tsne_spc = (tsne - gt_tsne) / np.maximum(gt_tsne, tsne.cpu().numpy())
+        stress_spc = (stress - gt_stress) / np.maximum(1e-5, np.maximum(gt_stress, stress.cpu().numpy()))
+        xing_spc = (xing - gt_xing) / np.maximum(1e-5, np.maximum(gt_xing, xing.cpu().numpy()))
+        l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(1e-5, np.maximum(gt_l1_angle, l1_angle.cpu().numpy()))
+        edge_spc = (edge - gt_edge) / np.maximum(1e-5, np.maximum(gt_edge, edge.cpu().numpy()))
+        ring_spc = (ring - gt_ring) / np.maximum(1e-5, np.maximum(gt_ring, ring.cpu().numpy()))
+        tsne_spc = (tsne - gt_tsne) / np.maximum(1e-5, np.maximum(gt_tsne, tsne.cpu().numpy()))
     
         theta, degree, node = get_radians(pred, data, 
                                           return_node_degrees=True,
@@ -257,6 +263,8 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
     return pred.cpu().numpy(), {
         'stress': stress.item(),
         'stress_spc': stress_spc.item(),
+        'xing': xing.item(),
+        'xing_spc': xing_spc.item(),
         'l1_angle': l1_angle.item(),
         'l1_angle_spc': l1_angle_spc.item(),
         'edge': edge.item(),
