@@ -22,7 +22,7 @@ from .._dependencies import *
 @dataclass
 class Xing(nn.Module):
     eps: float = 1e-5
-    scatter: bool = True, 
+    scatter: bool = True
     reduce: None = torch.sum
     
     def __post_init__(self):

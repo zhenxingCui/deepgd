@@ -111,6 +111,8 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
         callback = lambda *_, **__: None
     stress = []
     stress_spc = []
+    xing = []
+    xing_spc = []
     l1_angle = []
     l1_angle_spc = []
     edge = []
@@ -202,6 +204,7 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
         model.eval()
         data = preprocess_batch(model, data)
         stress_criterion = Stress()
+        xing_criterion = Xing()
         l1_angle_criterion = L1AngularLoss()
         edge_criterion = FixedMeanEdgeLengthVarianceLoss()
         ring_criterion = ExponentialRingLoss()
@@ -212,6 +215,7 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
 #             gt_stress = stress_criterion(gt, data)
         
         gt_stress = load_ground_truth(idx, 'stress', gt_file)
+        
         gt_l1_angle = load_ground_truth(idx, 'l1_angle', gt_file)
         gt_edge = load_ground_truth(idx, 'edge', gt_file)
         gt_ring = load_ground_truth(idx, 'ring', gt_file)
