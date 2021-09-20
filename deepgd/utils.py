@@ -3,6 +3,7 @@ from ._dependencies import *
 from .functions import *
 from .modules import *
 from .transform import *
+from .xing import *
 from ipynb.fs.defs.losses import *
     
 
@@ -300,7 +301,7 @@ def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None,
     }
     
     
-def graph_vis(G, pos, highlight_edge=None, file_name=None, **kwargs):
+def graph_vis(G, pos, *, highlight_edge=None, file_name=None, **kwargs):
     G = nx.Graph(G)
     graph_attr = dict(node_size=100, 
                       with_labels=False, 
