@@ -141,3 +141,7 @@ class StaticConfig:
         return str(self[None])
     
     
+def mkdirs(*folders):
+    for folder in folders:
+        if not os.path.isdir(folder):
+            os.makedirs(folder)
