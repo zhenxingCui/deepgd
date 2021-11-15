@@ -5,7 +5,7 @@ from .modules import *
 from .transform import *
 from .xing import *
 from ipynb.fs.defs.losses import *
-    
+
 
 def generate_polygon(n, radius=1):
     node_pos = [(radius * np.cos(2 * np.pi * i / n),
@@ -16,7 +16,7 @@ def generate_polygon(n, radius=1):
 
 def find_intersect(segments, accurate=True):
     intersect(segments)
-    
+
 
 def cuda_memsafe_iter(loader, callback):
     results = []
@@ -35,10 +35,10 @@ def cuda_memsafe_iter(loader, callback):
             print('CUDA memory overflow! Skip batch...')
             del batch
             torch.cuda.empty_cache()
-#     print(f'Iteration finished. {failed_count} out of {len(loader)} failed!')
+    #     print(f'Iteration finished. {failed_count} out of {len(loader)} failed!')
     return results
 
-    
+
 def train(model, criterion, optimizer, data_loader, callback=None):
     if callback is None:
         callback = lambda *_, **__: None
@@ -73,7 +73,7 @@ def train_with_dynamic_weights(model, controller, criterion, optimizer, data_loa
         components_all.append([comp.item() for comp in components])
         callback(output=output, loss=loss, components=components)
     return np.mean(loss_all), np.mean(components_all, axis=0)
-    
+
 
 def validate(model, criterion, data_loader, callback=None):
     if callback is None:
@@ -107,9 +107,12 @@ def validate_with_dynamic_weights(model, controller, criterion, data_loader, cal
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, gt_file='gt.csv', **model_params):
+def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, gt_pos=None, **model_params):
     if callback is None:
         callback = lambda *_, **__: None
+
+    device = next(iter(model.parameters())).device
+
     stress = []
     stress_spc = []
     xing = []
@@ -126,11 +129,11 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
     min_angle = []
     losses = []
     for idx in tqdm(idx_range):
-        gt_stress = load_ground_truth_stress(idx)
+        pos = None if gt_pos is None else torch.tensor(gt_pos[idx]).float().to(device)
         pred, metrics = get_performance_metrics(model, dataset[idx], idx,
                                                 criteria_list=criteria_list,
                                                 eval_method=eval_method,
-                                                gt_file=gt_file,
+                                                gt_pos=pos,
                                                 **model_params)
 
         stress.append(metrics['stress'])
@@ -150,7 +153,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
         losses.append(metrics['losses'])
 
         callback(idx=idx, pred=pred, metrics=metrics)
-    
+
     return {
         "stress": torch.tensor(stress),
         "stress_spc": torch.tensor(stress_spc),
@@ -171,7 +174,7 @@ def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=No
 
 
 def preprocess_batch(model, batch):
-    if type(batch) is not Batch:
+    if not isinstance(batch, Batch):
         batch = Batch.from_data_list([batch])
     device = next(model.parameters()).device
     return batch.to(device)
@@ -185,28 +188,30 @@ def predict(model, batch, criterion, **model_params):
     pred = output[0] if output is tuple else output
     loss, components = criterion(pred, batch, return_components=True)
     return output, loss, components
-    
-    
+
+
 @lru_cache(maxsize=1)
 def load_gt_dataframe(file="gt.csv"):
     return pd.read_csv(file)
-    
-    
+
+
 def load_ground_truth(idx, metric, file="gt.csv"):
     gt = load_gt_dataframe(file)
     return gt[gt['index'] == idx][metric].to_numpy()[0]
-    
+
 
 def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     gt_losses = pd.read_csv(file).to_numpy()
     if (gt_losses[:, 0] == index).any():
         return gt_losses[gt_losses[:, 0] == index][0, 1]
     return None
-    
-    
-def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, gt_file='gt.csv', **model_params):
+
+
+def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, gt_pos=None, **model_params):
     with torch.no_grad():
         model.eval()
+        canonicalize = CanonicalizationByStress()
+
         data = preprocess_batch(model, data)
         stress_criterion = Stress()
         xing_criterion = Xing()
@@ -214,45 +219,56 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
         edge_criterion = FixedMeanEdgeLengthVarianceLoss()
         ring_criterion = ExponentialRingLoss()
         tsne_criterion = TSNELoss()
-        
-#         if gt_stress is None:
-#             gt = get_ground_truth(data)
-#             gt_stress = stress_criterion(gt, data)
-        
-        gt_stress = load_ground_truth(idx, 'stress', gt_file)
-        gt_xing = load_ground_truth(idx, 'xing', gt_file)
-        gt_l1_angle = load_ground_truth(idx, 'l1_angle', gt_file)
-        gt_edge = load_ground_truth(idx, 'edge', gt_file)
-        gt_ring = load_ground_truth(idx, 'ring', gt_file)
-        gt_tsne = load_ground_truth(idx, 'tsne', gt_file)
-    
+
+        #         if gt_stress is None:
+        #             gt = get_ground_truth(data)
+        #             gt_stress = stress_criterion(gt, data)
+
+        # gt_stress = load_ground_truth(idx, 'stress', gt_file)
+        # gt_xing = load_ground_truth(idx, 'xing', gt_file)
+        # gt_l1_angle = load_ground_truth(idx, 'l1_angle', gt_file)
+        # gt_edge = load_ground_truth(idx, 'edge', gt_file)
+        # gt_ring = load_ground_truth(idx, 'ring', gt_file)
+        # gt_tsne = load_ground_truth(idx, 'tsne', gt_file)
+
+        if gt_pos is None:
+            gt_pos = data.gt_pos
+        gt_pos = canonicalize(gt_pos, data)
+
+        gt_stress = stress_criterion(gt_pos, data).item()
+        gt_xing = xing_criterion(gt_pos, data).item()
+        gt_l1_angle = l1_angle_criterion(gt_pos, data).item()
+        gt_edge = edge_criterion(gt_pos, data).item()
+        gt_ring = ring_criterion(gt_pos, data).item()
+        gt_tsne = tsne_criterion(gt_pos, data).item()
+
         if eval_method is None:
             raw_pred = model(data, **model_params)
-            pred = RescaleByStress()(raw_pred, data)
+            pred = canonicalize(raw_pred, data)
         elif eval_method == "tsne":
             hidden = model(data, output_hidden=True, numpy=True, **model_params)
             raw_pred = torch.tensor(tsne_project(hidden[-2]))
-            pred = RescaleByStress()(raw_pred, data)
+            pred = canonicalize(raw_pred, data)
         elif eval_method == "umap":
             hidden = model(data, output_hidden=True, numpy=True, **model_params)
             raw_pred = torch.tensor(umap_project(hidden[-2]))
-            pred = RescaleByStress()(raw_pred, data)
-        
-        stress = stress_criterion(pred, data)
-        xing = xing_criterion(pred, data)
-        l1_angle = l1_angle_criterion(pred, data)
-        edge = edge_criterion(pred, data)
-        ring = ring_criterion(pred, data)
-        tsne = tsne_criterion(pred, data)
-        
-        stress_spc = (stress - gt_stress) / np.maximum(1e-5, np.maximum(gt_stress, stress.cpu().numpy()))
-        xing_spc = (xing - gt_xing) / np.maximum(1e-5, np.maximum(gt_xing, xing.cpu().numpy()))
-        l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(1e-5, np.maximum(gt_l1_angle, l1_angle.cpu().numpy()))
-        edge_spc = (edge - gt_edge) / np.maximum(1e-5, np.maximum(gt_edge, edge.cpu().numpy()))
-        ring_spc = (ring - gt_ring) / np.maximum(1e-5, np.maximum(gt_ring, ring.cpu().numpy()))
-        tsne_spc = (tsne - gt_tsne) / np.maximum(1e-5, np.maximum(gt_tsne, tsne.cpu().numpy()))
-    
-        theta, degree, node = get_radians(pred, data, 
+            pred = canonicalize(raw_pred, data)
+
+        stress = stress_criterion(pred, data).item()
+        xing = xing_criterion(pred, data).item()
+        l1_angle = l1_angle_criterion(pred, data).item()
+        edge = edge_criterion(pred, data).item()
+        ring = ring_criterion(pred, data).item()
+        tsne = tsne_criterion(pred, data).item()
+
+        stress_spc = (stress - gt_stress) / np.maximum(1e-5, np.maximum(gt_stress, stress))
+        xing_spc = (xing - gt_xing) / np.maximum(1e-5, np.maximum(gt_xing, xing))
+        l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(1e-5, np.maximum(gt_l1_angle, l1_angle))
+        edge_spc = (edge - gt_edge) / np.maximum(1e-5, np.maximum(gt_edge, edge))
+        ring_spc = (ring - gt_ring) / np.maximum(1e-5, np.maximum(gt_ring, ring))
+        tsne_spc = (tsne - gt_tsne) / np.maximum(1e-5, np.maximum(gt_tsne, tsne))
+
+        theta, degree, node = get_radians(pred, data,
                                           return_node_degrees=True,
                                           return_node_indices=True)
         resolution_score = get_resolution_score(theta, degree, node)
@@ -262,18 +278,24 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
             _, losses = other_criteria(pred, data, return_components=True)
 
     return pred.cpu().numpy(), {
-        'stress': stress.item(),
-        'stress_spc': stress_spc.item(),
-        'xing': xing.item(),
-        'xing_spc': xing_spc.item(),
-        'l1_angle': l1_angle.item(),
-        'l1_angle_spc': l1_angle_spc.item(),
-        'edge': edge.item(),
-        'edge_spc': edge_spc.item(),
-        'ring': ring.item(),
-        'ring_spc': ring_spc.item(),
-        'tsne': tsne.item(),
-        'tsne_spc': tsne_spc.item(),
+        'stress': stress,
+        'gt_stress': gt_stress,
+        'stress_spc': stress_spc,
+        'xing': xing,
+        'gt_xing': gt_xing,
+        'xing_spc': xing_spc,
+        'l1_angle': l1_angle,
+        'gt_l1_angle': gt_l1_angle,
+        'l1_angle_spc': l1_angle_spc,
+        'edge': edge,
+        'gt_edge': gt_edge,
+        'edge_spc': edge_spc,
+        'ring': ring,
+        'gt_ring': gt_ring,
+        'ring_spc': ring_spc,
+        'tsne': tsne,
+        'gt_tsne': gt_tsne,
+        'tsne_spc': tsne_spc,
         'resolution_score': resolution_score.item(),
         'min_angle': min_angle.item(),
         'losses': list(map(torch.Tensor.item, losses))
@@ -281,9 +303,9 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
 
 
 def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None, **model_params):
-    if type(data) is not Batch:
+    if not isinstance(batch, Batch):
         data = Batch.from_data_list([data])
-        
+
     stress_criterion = Stress()
 
     if gt_stress is None:
@@ -294,19 +316,19 @@ def get_gt_performance_metrics(data, G=None, gt_stress=None, criteria_list=None,
         other_criteria = CompositeLoss(criteria_list)
         _, gt_losses = other_criteria(gt, data, return_components=True)
 
-    
+
     return {
         'gt_stress': gt_stress.item(),
         'gt_losses': list(map(torch.Tensor.item, gt_losses))
     }
-    
-    
+
+
 def graph_vis(G, pos, *, highlight_edge=None, file_name=None, **kwargs):
     G = nx.Graph(G)
-    graph_attr = dict(node_size=100, 
-                      with_labels=False, 
+    graph_attr = dict(node_size=100,
+                      with_labels=False,
                       labels=dict(zip(list(G.nodes), map(lambda n: n if type(n) is int else n[1:], list(G.nodes)))),
-                      font_color="white", 
+                      font_color="white",
                       font_weight="bold",
                       font_size=12)
     graph_attr.update(kwargs)
@@ -326,14 +348,14 @@ def graph_vis(G, pos, *, highlight_edge=None, file_name=None, **kwargs):
     plt.axis('equal')
     if file_name is not None:
         plt.savefig(file_name)
-        
+
 
 def visualize_graph(data, file_name=None, **kwargs):
     G = tg_to_nx(data)
-    graph_attr = dict(node_size=100, 
-                      with_labels=False, 
+    graph_attr = dict(node_size=100,
+                      with_labels=False,
                       labels=dict(zip(list(G.nodes), map(lambda n: str(n), list(G.nodes)))),
-                      font_color="white", 
+                      font_color="white",
                       font_weight="bold",
                       font_size=12)
     graph_attr.update(kwargs)
@@ -342,8 +364,8 @@ def visualize_graph(data, file_name=None, **kwargs):
     nx.draw(G, pos, **graph_attr)
     if file_name is not None:
         plt.savefig(file_name)
-    
-    
+
+
 def pca_project(vector, n=2):
     if vector.shape[1] == n:
         return vector
