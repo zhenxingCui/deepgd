@@ -59,7 +59,6 @@ def generate_data_list(G, *,
                        **kwargs):
     
     def generate_apsp(G):
-        n = G.number_of_nodes()
         apsp_gen = nx.all_pairs_shortest_path_length(G)
         return np.array([np.fromiter(j.values(), int)[np.argsort(np.fromiter(j.keys(), int))] for i, j in apsp_gen])
     
@@ -575,3 +574,4 @@ class LargeGraphLoader:
         
     def __len__(self):
         return len(self.file_list) // self.batch_size
+    

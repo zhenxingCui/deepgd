@@ -39,7 +39,8 @@ import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn
 from torch.utils.tensorboard import SummaryWriter
 from torch import autograd
-import torch_scatter
+import torch_scatter, torch_sparse
+import torch_geometric as pyg
 import torch_geometric.utils
 import torch_geometric.nn as gnn
 from torch_geometric.data import Data, DataLoader, Dataset

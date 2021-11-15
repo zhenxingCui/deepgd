@@ -198,7 +198,11 @@ def graph_wise_normalize(batch, mat):
     return mat / (sum_mat + 1e-5) 
 
 def make_batch(data):
-    if type(data) is not Batch:
-        data = Batch.from_data_list([data])
+    if not isinstance(data, Batch):
+        data = Batch.from_data_list([data]).to(data.edge_index.device)
     return data
+
+def merge_batch(batch1, batch2):
+    assert batch1.batch.device == batch2.batch.device
+    return Batch.from_data_list(batch1.to_data_list() + batch2.to_data_list()).to(batch1.batch.device)
     
