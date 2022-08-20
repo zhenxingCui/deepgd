@@ -4,14 +4,16 @@
 This is the code repository for the IEEE CG&A21 Paper entitled "[DeepGD: A Deep Learning Framework for Graph Drawing Using GNN](https://arxiv.org/abs/2106.15347)".
 
 ## Citation
-If you find our work useful in your research, please consider citing:
+If you used our code or find our work useful in your research, please consider citing:
 ```
-@misc{wang2021deepgd,
-      title={DeepGD: A Deep Learning Framework for Graph Drawing Using GNN}, 
-      author={Xiaoqi Wang and Kevin Yen and Yifan Hu and Han-Wei Shen},
-      year={2021},
-      eprint={2106.15347},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
+@article{deepgd,
+author={Wang, Xiaoqi and Yen, Kevin and Hu, Yifan and Shen, Han-Wei},
+journal={IEEE Computer Graphics and Applications},
+title={DeepGD: A Deep Learning Framework for Graph Drawing Using GNN},
+year={2021},
+volume={41},
+number={5},
+pages={32-44},
+doi={10.1109/MCG.2021.3093908}
 }
 ```
