@@ -139,7 +139,7 @@ def get_ground_truth(data, G, prog='neato', scaled=True):
 
 
 def get_pmds_layout(data, G, pmds_bin='hde/pmds', get_raw=False):
-    indot = str(nx.nx.nx_pydot.to_pydot(G))
+    indot = str(nx.nx_pydot.to_pydot(G))
     outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
     G = nx.nx_pydot.from_pydot(pydot.graph_from_dot_data(outdot)[0])
     raw_layout = nx.get_node_attributes(G, 'pos')
@@ -149,3 +149,10 @@ def get_pmds_layout(data, G, pmds_bin='hde/pmds', get_raw=False):
         pos = torch.tensor(list(sorted_layout.values()))
         return Normalization()(pos, data)
     return sorted_layout
+
+def get_pmds_layout_time(data, G, pmds_bin='hde/pmds', get_raw=False):
+    indot = str(nx.nx_pydot.to_pydot(G))
+    t_start = time.time()
+    outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
+    t_end = time.time()
+    return t_end - t_start
