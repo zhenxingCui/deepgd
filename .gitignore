@@ -12,3 +12,4 @@ graphviz_baseline/
 .lab
 .virtual_documents/
 poetry.lock
+.idea/

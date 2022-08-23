@@ -3,7 +3,7 @@ from ._dependencies import *
 from .functions import *
 from .modules import *
 from .transform import *
-from .xing import *
+from .metrics import *
 from ipynb.fs.defs.losses import *
 
 
@@ -107,76 +107,16 @@ def validate_with_dynamic_weights(model, controller, criterion, data_loader, cal
     return np.mean(loss_all), np.mean(components_all, axis=0)
 
 
-def test(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, gt_pos=None, **model_params):
-    if callback is None:
-        callback = lambda *_, **__: None
-
-    device = next(iter(model.parameters())).device
-
-    stress = []
-    stress_spc = []
-    xing = []
-    xing_spc = []
-    l1_angle = []
-    l1_angle_spc = []
-    edge = []
-    edge_spc = []
-    ring = []
-    ring_spc = []
-    tsne = []
-    tsne_spc = []
-    resolution_score = []
-    min_angle = []
-    losses = []
-    for idx in tqdm(idx_range):
-        pos = None if gt_pos is None else torch.tensor(gt_pos[idx]).float().to(device)
-        pred, metrics = get_performance_metrics(model, dataset[idx], idx,
-                                                criteria_list=criteria_list,
-                                                eval_method=eval_method,
-                                                gt_pos=pos,
-                                                **model_params)
-
-        stress.append(metrics['stress'])
-        stress_spc.append(metrics['stress_spc'])
-        xing.append(metrics['xing'])
-        xing_spc.append(metrics['xing_spc'])
-        l1_angle.append(metrics['l1_angle'])
-        l1_angle_spc.append(metrics['l1_angle_spc'])
-        edge.append(metrics['edge'])
-        edge_spc.append(metrics['edge_spc'])
-        ring.append(metrics['ring'])
-        ring_spc.append(metrics['ring_spc'])
-        tsne.append(metrics['tsne'])
-        tsne_spc.append(metrics['tsne_spc'])
-        resolution_score.append(metrics['resolution_score'])
-        min_angle.append(metrics['min_angle'])
-        losses.append(metrics['losses'])
-
-        callback(idx=idx, pred=pred, metrics=metrics)
-
-    return {
-        "stress": torch.tensor(stress),
-        "stress_spc": torch.tensor(stress_spc),
-        "xing": torch.tensor(xing),
-        "xing_spc": torch.tensor(xing_spc),
-        "l1_angle": torch.tensor(l1_angle),
-        "l1_angle_spc": torch.tensor(l1_angle_spc),
-        "edge": torch.tensor(edge),
-        "edge_spc": torch.tensor(edge_spc),
-        "ring": torch.tensor(ring),
-        "ring_spc": torch.tensor(ring_spc),
-        "tsne": torch.tensor(tsne),
-        "tsne_spc": torch.tensor(tsne_spc),
-        "resolution_score": torch.tensor(resolution_score),
-        "min_angle": torch.tensor(min_angle),
-        "losses": torch.tensor(losses),
-    }
-
-
 def preprocess_batch(model, batch):
     if not isinstance(batch, Batch):
         batch = Batch.from_data_list([batch])
     device = next(model.parameters()).device
+    return batch.to(device)
+
+
+def to_batch(batch, device='cpu'):
+    if not isinstance(batch, Batch):
+        batch = Batch.from_data_list([batch])
     return batch.to(device)
 
 
@@ -207,7 +147,171 @@ def load_ground_truth_stress(index, file='scaled_gt_loss.csv'):
     return None
 
 
-def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, gt_pos=None, **model_params):
+def evaluate(batch, pred, gt):
+    canonicalize = CanonicalizationByStress()
+    stress_criterion = Stress()
+    xing_criterion = Xing()
+    xangle_criterion = XingAngle()
+    rxa_criterion = RealXingAngle()
+    l1angle_criterion = L1AngularLoss()
+    edge_criterion = FixedMeanEdgeLengthVarianceLoss()
+    ring_criterion = ExponentialRingLoss()
+    tsne_criterion = TSNELoss()
+    spc_criterion = SPC(reduce=None)
+    
+    pred = canonicalize(pred, batch)
+    gt = canonicalize(gt, batch)
+
+    gt_stress = stress_criterion(gt, batch)
+    gt_xing = xing_criterion(gt, batch)
+    gt_xangle = xangle_criterion(gt, batch)
+    gt_rxa = rxa_criterion(gt, batch)
+    gt_l1angle = l1angle_criterion(gt, batch)
+    gt_edge = edge_criterion(gt, batch)
+    gt_ring = ring_criterion(gt, batch)
+    gt_tsne = tsne_criterion(gt, batch)
+
+    stress = stress_criterion(pred, batch)
+    xing = xing_criterion(pred, batch)
+    xangle = xangle_criterion(pred, batch)
+    rxa = rxa_criterion(pred, batch)
+    l1angle = l1angle_criterion(pred, batch)
+    edge = edge_criterion(pred, batch)
+    ring = ring_criterion(pred, batch)
+    tsne = tsne_criterion(pred, batch)
+
+    stress_spc = spc_criterion(stress, gt_stress)
+    xing_spc = spc_criterion(xing, gt_xing)
+    xangle_spc = spc_criterion(xangle, gt_xangle)
+    rxa_spc = spc_criterion(rxa, gt_rxa)
+    l1angle_spc = spc_criterion(l1angle, gt_l1angle)
+    edge_spc = spc_criterion(edge, gt_edge)
+    ring_spc = spc_criterion(ring, gt_ring)
+    tsne_spc = spc_criterion(tsne, gt_tsne)
+        
+    return {
+        'stress': stress.item(),
+        'gt_stress': gt_stress.item(),
+        'stress_spc': stress_spc.item(),
+        'xing': xing.item(),
+        'gt_xing': gt_xing.item(),
+        'xing_spc': xing_spc.item(),
+        'xangle': xangle.item(),
+        'gt_xangle': gt_xangle.item(),
+        'xangle_spc': xangle_spc.item(),
+        'rxa': rxa.item(),
+        'gt_rxa': gt_rxa.item(),
+        'rxa_spc': rxa_spc.item(),
+        'l1angle': l1angle.item(),
+        'gt_l1angle': gt_l1angle.item(),
+        'l1angle_spc': l1angle_spc.item(),
+        'edge': edge.item(),
+        'gt_edge': gt_edge.item(),
+        'edge_spc': edge_spc.item(),
+        'ring': ring.item(),
+        'gt_ring': gt_ring.item(),
+        'ring_spc': ring_spc.item(),
+        'tsne': tsne.item(),
+        'gt_tsne': gt_tsne.item(),
+        'tsne_spc': tsne_spc.item(),
+    }
+
+
+def test(model, dataset, idx_range, callback=None, pred_list=None, gt_list=None, **model_params):
+    if callback is None:
+        callback = lambda *_, **__: None
+
+    device = next(iter(model.parameters())).device
+
+    stress = []
+    stress_spc = []
+    gt_stress = []
+    xing = []
+    xing_spc = []
+    gt_xing = []
+    xangle = []
+    xangle_spc = []
+    gt_xangle = []
+    rxa = []
+    rxa_spc = []
+    gt_rxa = []
+    l1angle = []
+    l1angle_spc = []
+    gt_l1angle = []
+    edge = []
+    edge_spc = []
+    gt_edge = []
+    ring = []
+    ring_spc = []
+    gt_ring = []
+    tsne = []
+    tsne_spc = []
+    gt_tsne = []
+    
+    model.eval()
+    for idx in tqdm(idx_range):
+        with torch.no_grad():
+            batch = to_batch(dataset[idx], device)
+            pred = torch.tensor(pred_list[idx]).float().to(device) if pred_list is not None else model(batch, **model_params)
+            gt = torch.tensor(gt_list[idx]).float().to(device) if gt_list is not None else batch.gt_pos
+            metrics = evaluate(batch, pred, gt)
+
+        stress.append(metrics['stress'])
+        stress_spc.append(metrics['stress_spc'])
+        gt_stress.append(metrics['gt_stress'])
+        xing.append(metrics['xing'])
+        xing_spc.append(metrics['xing_spc'])
+        gt_xing.append(metrics['gt_xing'])
+        xangle.append(metrics['xangle'])
+        xangle_spc.append(metrics['xangle_spc'])
+        gt_xangle.append(metrics['gt_xangle'])
+        rxa.append(metrics['rxa'])
+        rxa_spc.append(metrics['rxa_spc'])
+        gt_rxa.append(metrics['gt_rxa'])
+        l1angle.append(metrics['l1angle'])
+        l1angle_spc.append(metrics['l1angle_spc'])
+        gt_l1angle.append(metrics['gt_l1angle'])
+        edge.append(metrics['edge'])
+        edge_spc.append(metrics['edge_spc'])
+        gt_edge.append(metrics['gt_edge'])
+        ring.append(metrics['ring'])
+        ring_spc.append(metrics['ring_spc'])
+        gt_ring.append(metrics['gt_ring'])
+        tsne.append(metrics['tsne'])
+        tsne_spc.append(metrics['tsne_spc'])
+        gt_tsne.append(metrics['gt_tsne'])
+
+        callback(idx=idx, pred=pred, metrics=metrics)
+
+    return {
+        "stress": torch.tensor(stress),
+        "gt_stress": torch.tensor(gt_stress),
+        "stress_spc": torch.tensor(stress_spc),
+        "xing": torch.tensor(xing),
+        "gt_xing": torch.tensor(gt_xing),
+        "xing_spc": torch.tensor(xing_spc),
+        "xangle": torch.tensor(xangle),
+        "gt_xangle": torch.tensor(gt_xangle),
+        "xangle_spc": torch.tensor(xangle_spc),
+        "rxa": torch.tensor(rxa),
+        "gt_rxa": torch.tensor(gt_rxa),
+        "rxa_spc": torch.tensor(rxa_spc),
+        "l1angle": torch.tensor(l1angle),
+        "gt_l1angle": torch.tensor(gt_l1angle),
+        "l1angle_spc": torch.tensor(l1angle_spc),
+        "edge": torch.tensor(edge),
+        "gt_edge": torch.tensor(gt_edge),
+        "edge_spc": torch.tensor(edge_spc),
+        "ring": torch.tensor(ring),
+        "gt_ring": torch.tensor(gt_ring),
+        "ring_spc": torch.tensor(ring_spc),
+        "tsne": torch.tensor(tsne),
+        "gt_tsne": torch.tensor(gt_tsne),
+        "tsne_spc": torch.tensor(tsne_spc),
+    }
+
+
+def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=None, pred_pos=None, gt_pos=None, **model_params):
     with torch.no_grad():
         model.eval()
         canonicalize = CanonicalizationByStress()
@@ -215,10 +319,13 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
         data = preprocess_batch(model, data)
         stress_criterion = Stress()
         xing_criterion = Xing()
-        l1_angle_criterion = L1AngularLoss()
+        xangle_criterion = XingAngle()
+        l1angle_criterion = L1AngularLoss()
         edge_criterion = FixedMeanEdgeLengthVarianceLoss()
         ring_criterion = ExponentialRingLoss()
         tsne_criterion = TSNELoss()
+        
+        spc_criterion = SPC(reduce=None)
 
         #         if gt_stress is None:
         #             gt = get_ground_truth(data)
@@ -235,12 +342,13 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
             gt_pos = data.gt_pos
         gt_pos = canonicalize(gt_pos, data)
 
-        gt_stress = stress_criterion(gt_pos, data).item()
-        gt_xing = xing_criterion(gt_pos, data).item()
-        gt_l1_angle = l1_angle_criterion(gt_pos, data).item()
-        gt_edge = edge_criterion(gt_pos, data).item()
-        gt_ring = ring_criterion(gt_pos, data).item()
-        gt_tsne = tsne_criterion(gt_pos, data).item()
+        gt_stress = stress_criterion(gt_pos, data)
+        gt_xing = xing_criterion(gt_pos, data)
+        gt_xangle = xangle_criterion(gt_pos, data)
+        gt_l1angle = l1angle_criterion(gt_pos, data)
+        gt_edge = edge_criterion(gt_pos, data)
+        gt_ring = ring_criterion(gt_pos, data)
+        gt_tsne = tsne_criterion(gt_pos, data)
 
         if eval_method is None:
             raw_pred = model(data, **model_params)
@@ -253,20 +361,28 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
             hidden = model(data, output_hidden=True, numpy=True, **model_params)
             raw_pred = torch.tensor(umap_project(hidden[-2]))
             pred = canonicalize(raw_pred, data)
+        elif eval_method == "gt":
+            raw_pred = data.gt_pos
+            pred = canonicalize(raw_pred, data)
+        elif eval_method == "load":
+            raw_pred = pred_pos
+            pred = canonicalize(raw_pred, data)
 
-        stress = stress_criterion(pred, data).item()
-        xing = xing_criterion(pred, data).item()
-        l1_angle = l1_angle_criterion(pred, data).item()
-        edge = edge_criterion(pred, data).item()
-        ring = ring_criterion(pred, data).item()
-        tsne = tsne_criterion(pred, data).item()
+        stress = stress_criterion(pred, data)
+        xing = xing_criterion(pred, data)
+        xangle = xangle_criterion(pred, data)
+        l1angle = l1angle_criterion(pred, data)
+        edge = edge_criterion(pred, data)
+        ring = ring_criterion(pred, data)
+        tsne = tsne_criterion(pred, data)
 
-        stress_spc = (stress - gt_stress) / np.maximum(1e-5, np.maximum(gt_stress, stress))
-        xing_spc = (xing - gt_xing) / np.maximum(1e-5, np.maximum(gt_xing, xing))
-        l1_angle_spc = (l1_angle - gt_l1_angle) / np.maximum(1e-5, np.maximum(gt_l1_angle, l1_angle))
-        edge_spc = (edge - gt_edge) / np.maximum(1e-5, np.maximum(gt_edge, edge))
-        ring_spc = (ring - gt_ring) / np.maximum(1e-5, np.maximum(gt_ring, ring))
-        tsne_spc = (tsne - gt_tsne) / np.maximum(1e-5, np.maximum(gt_tsne, tsne))
+        stress_spc = spc_criterion(stress, gt_stress)
+        xing_spc = spc_criterion(xing, gt_xing)
+        xangle_spc = spc_criterion(xangle, gt_xangle)
+        l1angle_spc = spc_criterion(l1angle, gt_l1angle)
+        edge_spc = spc_criterion(edge, gt_edge)
+        ring_spc = spc_criterion(ring, gt_ring)
+        tsne_spc = spc_criterion(tsne, gt_tsne)
 
         theta, degree, node = get_radians(pred, data,
                                           return_node_degrees=True,
@@ -278,27 +394,104 @@ def get_performance_metrics(model, data, idx, criteria_list=None, eval_method=No
             _, losses = other_criteria(pred, data, return_components=True)
 
     return pred.cpu().numpy(), {
-        'stress': stress,
-        'gt_stress': gt_stress,
-        'stress_spc': stress_spc,
-        'xing': xing,
-        'gt_xing': gt_xing,
-        'xing_spc': xing_spc,
-        'l1_angle': l1_angle,
-        'gt_l1_angle': gt_l1_angle,
-        'l1_angle_spc': l1_angle_spc,
-        'edge': edge,
-        'gt_edge': gt_edge,
-        'edge_spc': edge_spc,
-        'ring': ring,
-        'gt_ring': gt_ring,
-        'ring_spc': ring_spc,
-        'tsne': tsne,
-        'gt_tsne': gt_tsne,
-        'tsne_spc': tsne_spc,
+        'stress': stress.item(),
+        'gt_stress': gt_stress.item(),
+        'stress_spc': stress_spc.item(),
+        'xing': xing.item(),
+        'gt_xing': gt_xing.item(),
+        'xing_spc': xing_spc.item(),
+        'xangle': xangle.item(),
+        'gt_xangle': gt_xangle.item(),
+        'xangle_spc': xangle_spc.item(),
+        'l1angle': l1angle.item(),
+        'gt_l1angle': gt_l1angle.item(),
+        'l1angle_spc': l1angle_spc.item(),
+        'edge': edge.item(),
+        'gt_edge': gt_edge.item(),
+        'edge_spc': edge_spc.item(),
+        'ring': ring.item(),
+        'gt_ring': gt_ring.item(),
+        'ring_spc': ring_spc.item(),
+        'tsne': tsne.item(),
+        'gt_tsne': gt_tsne.item(),
+        'tsne_spc': tsne_spc.item(),
         'resolution_score': resolution_score.item(),
         'min_angle': min_angle.item(),
         'losses': list(map(torch.Tensor.item, losses))
+    }
+
+
+def test_old(model, criteria_list, dataset, idx_range, callback=None, eval_method=None, gt_pos=None, pred_pos=None, **model_params):
+    if callback is None:
+        callback = lambda *_, **__: None
+
+    device = next(iter(model.parameters())).device
+
+    stress = []
+    stress_spc = []
+    xing = []
+    xing_spc = []
+    xangle = []
+    xangle_spc = []
+    l1angle = []
+    l1angle_spc = []
+    edge = []
+    edge_spc = []
+    ring = []
+    ring_spc = []
+    tsne = []
+    tsne_spc = []
+    resolution_score = []
+    min_angle = []
+    losses = []
+    for idx in tqdm(idx_range):
+        g_pos = torch.tensor(gt_pos[idx]).float().to(device) if gt_pos is not None else None
+        p_pos = torch.tensor(pred_pos[idx]).float().to(device) if pred_pos is not None else None
+        pred, metrics = get_performance_metrics(model, dataset[idx], idx,
+                                                criteria_list=criteria_list,
+                                                eval_method=eval_method,
+                                                pred_pos=p_pos,
+                                                gt_pos=g_pos,
+                                                **model_params)
+
+        stress.append(metrics['stress'])
+        stress_spc.append(metrics['stress_spc'])
+        xing.append(metrics['xing'])
+        xing_spc.append(metrics['xing_spc'])
+        xangle.append(metrics['xangle'])
+        xangle_spc.append(metrics['xangle_spc'])
+        l1angle.append(metrics['l1angle'])
+        l1angle_spc.append(metrics['l1angle_spc'])
+        edge.append(metrics['edge'])
+        edge_spc.append(metrics['edge_spc'])
+        ring.append(metrics['ring'])
+        ring_spc.append(metrics['ring_spc'])
+        tsne.append(metrics['tsne'])
+        tsne_spc.append(metrics['tsne_spc'])
+        resolution_score.append(metrics['resolution_score'])
+        min_angle.append(metrics['min_angle'])
+        losses.append(metrics['losses'])
+
+        callback(idx=idx, pred=pred, metrics=metrics)
+
+    return {
+        "stress": torch.tensor(stress),
+        "stress_spc": torch.tensor(stress_spc),
+        "xing": torch.tensor(xing),
+        "xing_spc": torch.tensor(xing_spc),
+        "xangle": torch.tensor(xangle),
+        "xangle_spc": torch.tensor(xangle_spc),
+        "l1angle": torch.tensor(l1angle),
+        "l1angle_spc": torch.tensor(l1angle_spc),
+        "edge": torch.tensor(edge),
+        "edge_spc": torch.tensor(edge_spc),
+        "ring": torch.tensor(ring),
+        "ring_spc": torch.tensor(ring_spc),
+        "tsne": torch.tensor(tsne),
+        "tsne_spc": torch.tensor(tsne_spc),
+        "resolution_score": torch.tensor(resolution_score),
+        "min_angle": torch.tensor(min_angle),
+        "losses": torch.tensor(losses),
     }
 
 

@@ -198,6 +198,9 @@ class GCNLayer(nn.Module):
       
         
 class GNNLayer(nn.Module):
+    NORM = gnn.GraphNorm
+    ACT = nn.GELU
+    
     def __init__(self,
                  nfeat_dims,
                  efeat_dim,
@@ -219,8 +222,8 @@ class GNNLayer(nn.Module):
         self.enet = nn.Linear(efeat_dim, in_dim * out_dim) if edge_net is None and efeat_dim > 0 else edge_net
         self.conv = gnn.NNConv(in_dim, out_dim, nn=self.enet, aggr=aggr, root_weight=root_weight)
         self.dense = nn.Linear(out_dim, out_dim) if dense else nn.Identity()
-        self.bn = gnn.BatchNorm(out_dim) if bn else nn.Identity()
-        self.act = nn.LeakyReLU() if act else nn.Identity()
+        self.bn = self.NORM(out_dim) if bn else nn.Identity()
+        self.act = self.ACT() if act else nn.Identity()
         self.dp = dp and nn.Dropout(dp) or nn.Identity()
         self.skip = skip
         self.proj = nn.Linear(in_dim, out_dim, bias=False) if in_dim != out_dim else nn.Identity()
@@ -516,11 +519,13 @@ class GNNGraphDrawing(nn.Module):
     
     
 class DenseLayer(nn.Module):
+    ACT = nn.GELU
+    
     def __init__(self, in_dim, out_dim=None, skip=True, bn=True, act=True, dp=None, _flip=False):
         super().__init__()
         out_dim = out_dim or in_dim
         if type(act) is bool:
-            act = nn.LeakyReLU() if act else nn.Identity()
+            act = self.ACT() if act else nn.Identity()
         self._flip = _flip
         if self._flip:
             self.net = nn.Sequential(

@@ -5,6 +5,9 @@ from .layouts import *
 from .functions import *
 from .transform import *
 
+from natsort import natsorted
+from functools import lru_cache
+
 
 def load_mtx(file):
     data = scipy.io.mmread(file)
@@ -20,15 +23,34 @@ def generate_random_index(data_path='data/rome',
     with open(index_file, "w") as fout:
         for f in file_names:
             print(f, file=fout) 
-           
+
+
+@lru_cache(maxsize=None)
+def load_pos(method, dataset="rome", seed=None, generate=False, G_list_pkl="cache/G_list.pickle", sep="@"):
+    if seed is not None:
+        method = f"{method}{sep}{seed}"
+    if sep in method:
+        method_seed = method.split(sep)
+        method = sep.join(method_seed[:-1])
+        seed = int(method_seed[-1])
+    name = method if seed is None else f"{method}{sep}{seed}"
+    if generate and not os.path.exists(f'layouts/{dataset}/{name}.npy'):
+        layouts = []
+        for G in tqdm(pickle.load(open(G_list_pkl, 'rb'))):
+            layouts.append(draw_layout(G, method, draw=False, seed=seed, numpy=True))
+        os.makedirs(f'layouts/{dataset}', exist_ok=True)
+        np.save(f'layouts/{dataset}/{name}.npy', layouts)
+    return np.load(f'layouts/{dataset}/{name}.npy', allow_pickle=True)
             
+    
 @cache
 def load_G_list(*, data_path, index_file=None, data_slice=slice(None)):
     if index_file is not None:
+        if not os.path.exists(index_file):
+            generate_random_index(data_path=data_path, index_file=index_file)
         all_files = [f'{data_path}/{f}' for f in open(index_file).read().splitlines() if f.rstrip()]
     elif data_path is not None:
-        all_files = sorted(glob.glob(f'{data_path}/*.graphml'), 
-                           key=lambda x: int(re.search('(?<=grafo)\d+(?=\.)', x).group(0)))
+        all_files = natsorted(glob.glob(f'{data_path}/*.graphml'))
     else:
         return None
     if type(data_slice) is int:
@@ -548,6 +570,22 @@ class LazyDeviceMappingDataLoader:
             
     def __len__(self):
         return len(self.loader)
+    
+
+# class EagerDeviceMappingDataLoader:
+#     def __init__(self, data_list, batch_size, shuffle, device):
+#         self.loader = DataLoader([data.to(device) for data in data_list], 
+# #                                  num_workers=1,
+# #                                  pin_memory=True,
+# #                                  prefetch_factor=8,
+#                                  batch_size=batch_size, 
+#                                  shuffle=shuffle)
+    
+#     def __iter__(self):
+#         yield from self.loader
+            
+#     def __len__(self):
+#         return len(self.loader)
         
         
 class LargeGraphLoader:

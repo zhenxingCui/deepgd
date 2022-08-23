@@ -2,6 +2,8 @@ from ._dependencies import *
 
 from .transform import *
 
+import s_gd2
+
 
 def interpolate(layout1, layout2, r):
     return {node: tuple(np.average([layout1[node], layout2[node]], axis=0, weights=(1-r, r))) for node in layout1}
@@ -138,21 +140,38 @@ def get_ground_truth(data, G, prog='neato', scaled=True):
     return gt
 
 
-def get_pmds_layout(data, G, pmds_bin='hde/pmds', get_raw=False):
+def get_pmds_layout(G, pmds_bin='hde/pmds'):
     indot = str(nx.nx_pydot.to_pydot(G))
     outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
     G = nx.nx_pydot.from_pydot(pydot.graph_from_dot_data(outdot)[0])
     raw_layout = nx.get_node_attributes(G, 'pos')
     layout = {int(n): tuple(map(float, pos.replace('"', '').split(','))) for n, pos in raw_layout.items()}
-    sorted_layout = dict(sorted(layout.items(), key=lambda pair: pair[0]))
-    if not get_raw:
-        pos = torch.tensor(list(sorted_layout.values()))
-        return Normalization()(pos, data)
-    return sorted_layout
+    return dict(sorted(layout.items(), key=lambda pair: pair[0]))
+    
 
-def get_pmds_layout_time(data, G, pmds_bin='hde/pmds', get_raw=False):
-    indot = str(nx.nx_pydot.to_pydot(G))
-    t_start = time.time()
-    outdot = subprocess.check_output([pmds_bin], text=True, input=indot)
-    t_end = time.time()
-    return t_end - t_start
+def draw_layout(G, method, draw=True, numpy=False, seed=None):
+    if seed is None:
+        seed = random.randint(0, 2**16)
+    if method == 'fa2':
+        random.seed(seed)
+        layout = get_fa2_layout(G)
+    elif method == 'pmds':
+        layout = get_pmds_layout(G)
+    elif method == 'sgd2':
+        pos = s_gd2.layout(*zip(*G.edges), random_seed=seed)
+        layout = {i: p for i, p in zip(range(G.number_of_nodes()), pos.tolist())}
+    else:
+        try:
+            fn = getattr(nx.drawing.layout, f'{method}_layout')
+            if method == 'spring':
+                layout = fn(G, seed=seed)
+            else:
+                layout = fn(G)
+        except:
+            G.graph['start'] = seed#random.randrange(1e6)
+            layout = nx.drawing.nx_agraph.graphviz_layout(G, prog=method)
+    if draw:
+        nx.draw(G, pos=layout)
+    if numpy:
+        return np.array(list(layout.values()))
+    return layout
